@@ -2,6 +2,8 @@ import { Router } from "express";
 import bcrypt from 'bcrypt';
 import pool from "../db/index.ts";
 import { randomUUID } from "node:crypto";
+import jwt from "jsonwebtoken";
+import { authenticate } from "../middleware/auth.middleware.ts";
 
 const router = Router();
 
@@ -70,11 +72,22 @@ router.post("/login", async (req, res) => {
       user.password_hash
     );
 
-    if (!passwordMatch) {
-      return res.status(401).json({
-        message: "Invalid email or password",
-      });
-    }
+      if (!passwordMatch) {
+          return res.status(401).json({
+              message: "Invalid email or password",
+          });
+      }
+
+      const token = jwt.sign(
+          {
+              userId: user.id,
+              email: user.email,
+          },
+          process.env.JWT_SECRET!,
+          {
+              expiresIn: "15m",
+          }
+      );
 
     return res.status(200).json({
       message: "Login successful",
@@ -82,6 +95,7 @@ router.post("/login", async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        token: token
       },
     });
   } catch (error) {
@@ -93,5 +107,13 @@ router.post("/login", async (req, res) => {
   }
 });
 
+router.get("/me", authenticate, (req, res) => {
+  console.log("Authenticated user:", req.user);
+
+  res.json({
+    message: "You are authenticated",
+    user: req.user,
+  });
+});
 
 export default router;
