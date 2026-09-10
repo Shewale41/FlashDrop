@@ -196,4 +196,24 @@ Last committed      A's uncommitted
 
 A's uncommitted 0 isn't visible to B.
 
-17. 
+17. UPDATE -sql
+ When PostgreSQL executes that UPDATE, it needs to protect the row while changing it.
+   -A
+│
+├── BEGIN
+│
+├── UPDATE drop_1
+│      ↓
+│   🔒 row is locked
+│
+└── transaction still open
+
+18. FOR UPDATE - sql (bvery important for our race codition to solve)
+ for update is appended with the select and locks the selected rows until the transaction ends with commit or rollback 
+ so simply prevents update , delete and SELECT ... FOR UPDATE (another transaction trying to lock the row to make a decision). 
+- for example - select col1,col2 from drops where id = 'drop_1' FOR UPDATE;
+
+ - No, Transaction B will not even get the row until Transaction A is finished.
+ - When Transaction B executes SELECT ... FOR UPDATE on a row that is already locked by Transaction A, the entire SELECT query in Transaction B pauses and waits.
+
+19. 
