@@ -216,4 +216,10 @@ A's uncommitted 0 isn't visible to B.
  - No, Transaction B will not even get the row until Transaction A is finished.
  - When Transaction B executes SELECT ... FOR UPDATE on a row that is already locked by Transaction A, the entire SELECT query in Transaction B pauses and waits.
 
-19. 
+19. promise vs promise.all
+ - promise returns an object after completion of a asynchrouns request / operation - uses only one await for that request . eithers fullfills or rejected
+ - Promise.all can take an array of promises and run each one parallely (fires them at a same time ) and returns one promise object when all of them are fullfilled - array destrcuturing is maintained - fail-fast if one request is rejected or throws error then promise.all halts and dont care about other pending requests and goes to catch block
+ - Promise.allSettled - to avaoid the fail-fast and run the other pending ones we use Promise.allSettled
+
+20.  
+ 
