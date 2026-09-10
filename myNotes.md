@@ -163,3 +163,37 @@ COMMIT
 13. try catch finally 
  we already know this try catch finally - try will run fidt line by line and if any error happens then execution is halted and then whater ever is happend that error is is thrown from the js call stack as an error object and searches for the nearest catch block and then error is shown i mean the catch blocj is executed and then finally - finally will run even if error no error try runs or fails , even if catch runs finally will run in both cases 
 
+14. connection pool and client.release()
+ each transactions needs a separate conenction - so normally we ask for a connection from the pool and we do our trancation queries on that for trancation , in normal or genral days for non trancation or normal wuereis like getting a item we dont need a seperate connection as we can run that in any connection does'mt matter init 
+ -after we're done with the connection we should close that connection , we can do that in finally of the try catch trios okay 
+ -If you forget to release a client, that connection stays locked in a "busy" state indefinitely. so we should do client.release()
+
+15. BEGIN - SQL 
+ BEGIN - what it does is - it will group all the below queries into one transacction
+ it doesnt mean to lock everything and dont share the data here were working on right now with anyone else   
+
+16. Case - when two transactions work on a same data at the same time & what COMMIT -SQL does 
+ - then say A and B both work on the same drops = 1 and first A runs makes it 0 and it's not commited yet so will that make B see that values as zero 
+ -B will see the last commited state od drops which is 1 not A's uncommited state 0 it doesnt even know about A or what it's doing 
+ -until A is commited that will become the new state that's why we need commit okay 
+ -              DROP_1
+               │
+       ┌───────┴────────┐
+       │                │
+Last committed      A's uncommitted
+     state               state
+       │                │
+   inventory=1       inventory=0
+       │                │
+       └───────┬────────┘
+               │
+          What B sees
+               ↓
+               1
+
+  Under PostgreSQL's default isolation level, B sees the last committed version, which is:
+   1
+
+A's uncommitted 0 isn't visible to B.
+
+17. 
