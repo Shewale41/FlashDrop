@@ -82,15 +82,25 @@ router.post("/", authenticate, async (req, res) => {
       reservation: reservation.rows[0],
     });
   } catch (error) {
-    console.error(error);
+  console.error(error);
 
-    // Undo everything if anything failed
-    await client.query("ROLLBACK");
+  await client.query("ROLLBACK");
 
-    return res.status(500).json({
-      message: "Something went wrong",
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "23505"
+  ) {
+    return res.status(409).json({
+      message: "You have already reserved this drop",
     });
-  } finally {
+  }
+
+  return res.status(500).json({
+    message: "Something went wrong",
+  });
+} finally {
     // Return connection to pool
     client.release();
   }

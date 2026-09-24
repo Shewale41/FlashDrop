@@ -221,5 +221,5 @@ A's uncommitted 0 isn't visible to B.
  - Promise.all can take an array of promises and run each one parallely (fires them at a same time ) and returns one promise object when all of them are fullfilled - array destrcuturing is maintained - fail-fast if one request is rejected or throws error then promise.all halts and dont care about other pending requests and goes to catch block
  - Promise.allSettled - to avaoid the fail-fast and run the other pending ones we use Promise.allSettled
 
-20.  
+20.   
  

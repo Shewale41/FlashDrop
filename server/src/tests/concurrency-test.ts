@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-const token = "removed the jwt haaha (you can add yours here)";
+const token = "";
 
 const makeReservation = async (requestName: string) => {
   console.log(`${requestName}: sending request`);
