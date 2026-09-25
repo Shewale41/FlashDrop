@@ -221,5 +221,35 @@ A's uncommitted 0 isn't visible to B.
  - Promise.all can take an array of promises and run each one parallely (fires them at a same time ) and returns one promise object when all of them are fullfilled - array destrcuturing is maintained - fail-fast if one request is rejected or throws error then promise.all halts and dont care about other pending requests and goes to catch block
  - Promise.allSettled - to avaoid the fail-fast and run the other pending ones we use Promise.allSettled
 
-20.   
+20. Optimistic vs Pessimistic Locking
+ -Pessimistic Locking
+
+ Definition: Locks database rows immediately upon reading them so no other transaction can access or modify them until finished.
+
+ What it means: Requests wait in line one by one, completely preventing race conditions during heavy, simultaneous writes (like flash sales).
+
+ -Optimistic Locking
+
+ Definition: Allows concurrent reads without locking rows, relying on a "version" column to check for conflicts only when saving.
+
+ What it means: Offers maximum read speed without database waiting, but requests fail and require retries if another user saved first.  
  
+21. EXPLAIN - SQl
+ -EXPLAIN shows us the plan that postgresql's query planner generated to execute our sql.
+ -the planner will see the tables , size , indexes and will tell us the best and cheapest way to fetch data okay
+
+22. Indexing  
+ -indexing is the creating an separate data strcuture of the indexed value of the main table , it stores the indexed values in sorted order and in btree style.
+ -it contains the value of data say string and the actual pointer of the data in the main table where does it exits physically.
+ -do not index everything because its costly as it creates a new separte file of the index and pointer. so index only neccessary values . increases the speed of read but slow downs insert,uodate,delete as it has to re-balance teh tree and update those values in the tree.
+ -so indexing should only applied to frequent read queries not those who constantly updates okay.
+ -syntax -> create index index_name on table_name(column_name);
+ - we don't index everything , not to index when there are very few distinct values  
+ -usiing a index on small data doesn't makes sense
+
+23. Selectivity - concept
+ -how unique the values in columns are or fraction of total rows a query will return
+ -higly selective - 1/100000 rows like select drop_name = "prodcut 9999" - unique product row - in highly selective index is used
+ -less selectivity - 2000/100000 rows like select inventory where inventry is 100 - as there can many rows with same exact value 
+
+24.  
