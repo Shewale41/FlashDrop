@@ -2,8 +2,10 @@ import { Router } from "express";
 import pool from "../db/index.ts";
 import { randomUUID } from "node:crypto";
 import { authenticate } from "../middleware/auth.middleware.ts";
+import redisClient from "../db/redis.ts";
 
 const router = Router();
+
 
 router.post("/", authenticate, async (req, res) => {
   const client = await pool.connect();
@@ -47,7 +49,6 @@ router.post("/", authenticate, async (req, res) => {
 
     const drop = dropData.rows[0];
 
-    // Check inventory while holding the row lock
     if (drop.available_inventory <= 0) {
       await client.query("ROLLBACK");
 
@@ -74,37 +75,54 @@ router.post("/", authenticate, async (req, res) => {
       [dropId]
     );
 
-    // Everything succeeded
+    // Commit the reservation and inventory change
     await client.query("COMMIT");
+
+    // Invalidate cached drop only after successful commit
+    const cacheKey = `flashdrop:drop:${dropId}`;
+
+    try {
+      await redisClient.del(cacheKey);
+      console.log("CACHE INVALIDATED:", cacheKey);
+    } catch (cacheError) {
+      console.error(
+        "Reservation committed, but cache invalidation failed:",
+        cacheError
+      );
+    }
 
     return res.status(201).json({
       message: "Reservation successful",
       reservation: reservation.rows[0],
     });
   } catch (error) {
-  console.error(error);
+    console.error(error);
 
-  await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("Transaction rollback failed:", rollbackError);
+    }
 
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  ) {
-    return res.status(409).json({
-      message: "You have already reserved this drop",
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "23505"
+    ) {
+      return res.status(409).json({
+        message: "You have already reserved this drop",
+      });
+    }
+
+    return res.status(500).json({
+      message: "Something went wrong",
     });
-  }
-
-  return res.status(500).json({
-    message: "Something went wrong",
-  });
-} finally {
-    // Return connection to pool
+  } finally {
     client.release();
   }
 });
+
     
 
 export default router;
