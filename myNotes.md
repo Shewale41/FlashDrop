@@ -278,4 +278,6 @@ Redis
  - great thing to do here is that we will invalidate the cache on every update or successfull transaction commit
  - Remember ttl is not the only solution it only deletes the key after the timeout
 
-   
+27. cache stampede
+ - Multiple requests arrive after the cache expires and all try PostgreSQL before one repopulates Redis.
+   This is called a cache stampede.  

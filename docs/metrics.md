@@ -126,6 +126,24 @@ The indexed lookup was ~78x faster in this benchmark.
   to end-to-end Node.js request latency.
 
 
+### k6 GET /drops/drop_2 — Run 1
+
+- Virtual users: 10
+- Duration: 30 seconds
+- Requests completed: 222
+- Throughput: 7.17 requests/second
+- HTTP failures: 0%
+- Checks passed: 444/444 (100%)
+- Average HTTP latency: 374 ms
+- Minimum latency: 0.510 ms
+- p50: 4.03 ms
+- p90: 7.54 ms
+- p95: 18.53 ms
+- Maximum latency: 9.79 seconds
+- Cache state: Not independently verified for every request
+- Notes: Large gap between average and median; investigate
+  long-tail latency before making performance claims.
+
 ### Cache-Aside Benchmark
 
 Status: Pending
