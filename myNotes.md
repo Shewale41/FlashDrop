@@ -252,4 +252,30 @@ A's uncommitted 0 isn't visible to B.
  -higly selective - 1/100000 rows like select drop_name = "prodcut 9999" - unique product row - in highly selective index is used
  -less selectivity - 2000/100000 rows like select inventory where inventry is 100 - as there can many rows with same exact value 
 
-24.  
+24.  Redis - we already know so much stores in key value pairs 
+ - get , set , hashmap , lists (which acts as queue & stack both when used properly lpush rpush lpop rpop) - remember we did this already very ages ago
+
+25. redis cache-aside pattern - already seen in previous projects
+ - Client
+  ↓
+Express
+  ↓
+Redis
+  │
+  ├── HIT ──────→ return cached data ⚡
+  │
+  └── MISS
+       ↓
+   PostgreSQL
+       ↓
+     Redis
+       ↓
+   Response
+ - simply find one in redis (hit) if not there go to db then cache it in redis for next time (miss)
+
+26. Cache Invalidation - Delete on Write (very important)
+ - when the value the database is changed and we still have the stale data in the cache we have to delete that key invalidate that data 
+ - great thing to do here is that we will invalidate the cache on every update or successfull transaction commit
+ - Remember ttl is not the only solution it only deletes the key after the timeout
+
+   

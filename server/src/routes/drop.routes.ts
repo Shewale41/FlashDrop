@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Drop } from "../types/drop.ts";
 import pool from "../db/index.ts";
+import redisClient from "../db/redis.ts";
 
 const router = Router();
 
@@ -27,23 +28,62 @@ router.get("/", async (_req, res) => {
   res.json(result.rows);
 });
 
+
 router.get("/:id", async (req, res) => {
-  const id = req.params.id;
+  const { id } = req.params;
+  const cacheKey = `flashdrop:drop:${id}`;
 
-  const result = await pool.query(
-    "SELECT * FROM drops WHERE id = $1",
-    [id]
-  );
+  // 1. Try Redis first.
+  try {
+    const cachedDrop = await redisClient.get(cacheKey);
 
-  if (result.rows.length === 0) {
-    res.status(404).json({
-      message: "Drop doesn't exist",
-    });
-    return;
+    if (cachedDrop !== null) {
+      console.log("CACHE HIT:", cacheKey);
+      return res.json(JSON.parse(cachedDrop));
+    }
+  } catch (error) {
+    // Redis is unavailable: continue to PostgreSQL.
+    console.error("Redis GET failed:", error);
   }
 
-  res.json(result.rows[0]);
+  // 2. Cache miss (or Redis failure): query PostgreSQL.
+  try {
+    console.log("CACHE MISS:", cacheKey);
+
+    const result = await pool.query(
+      "SELECT * FROM drops WHERE id = $1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "Drop doesn't exist",
+      });
+    }
+
+    const drop = result.rows[0];
+
+    // 3. Populate Redis, but don't fail the request if caching fails.
+    try {
+      await redisClient.set(
+        cacheKey,
+        JSON.stringify(drop),
+        { EX: 30 }
+      );
+    } catch (error) {
+      console.error("Redis SET failed:", error);
+    }
+
+    return res.json(drop);
+  } catch (error) {
+    console.error("Failed to fetch drop:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch drop",
+    });
+  }
 });
+
 
 router.post("/", async (req, res) => {
   const { id, name, availableInventory } = req.body;
@@ -61,26 +101,45 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const id = req.params.id;
-
+  const { id } = req.params;
   const { name, availableInventory } = req.body;
 
-  const updatedRow = await pool.query(
-    `UPDATE drops
-     SET name = $1,
-         available_inventory = $2
-     WHERE id = $3
-     RETURNING *`,
-    [name, availableInventory, id]
-  );
+  try {
+    const updatedRow = await pool.query(
+      `UPDATE drops
+       SET name = $1,
+           available_inventory = $2
+       WHERE id = $3
+       RETURNING *`,
+      [name, availableInventory, id]
+    );
 
-  if (updatedRow.rows.length === 0) {
-    return res.status(404).json({
-      message: "Drop not found",
+    if (updatedRow.rows.length === 0) {
+      return res.status(404).json({
+        message: "Drop not found",
+      });
+    }
+
+    const updatedDrop = updatedRow.rows[0];
+    const cacheKey = `flashdrop:drop:${id}`;
+
+    // Invalidate the cache after PostgreSQL succeeds.
+    try {
+      await redisClient.del(cacheKey);
+      console.log("CACHE INVALIDATED:", cacheKey);
+    } catch (error) {
+      // The database update succeeded, so don't misreport it as failed.
+      console.error("Cache invalidation failed:", error);
+    }
+
+    return res.status(200).json(updatedDrop);
+  } catch (error) {
+    console.error("Failed to update drop:", error);
+
+    return res.status(500).json({
+      message: "Failed to update drop",
     });
   }
-
-  res.status(200).json(updatedRow.rows[0]);
 });
 
 router.delete("/:id", async (req, res) => {
