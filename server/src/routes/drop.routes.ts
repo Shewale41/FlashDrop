@@ -23,10 +23,22 @@ const router = Router();
 //   },
 // ];
 
+
+
 router.get("/", async (_req, res) => {
-  const result = await pool.query("SELECT * FROM drops");
-  res.json(result.rows);
+  try {
+    const result = await pool.query("SELECT * FROM drops");
+    return res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Failed to fetch drops:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch drops",
+    });
+  }
 });
+
+
 
 
 router.get("/:id", async (req, res) => {
