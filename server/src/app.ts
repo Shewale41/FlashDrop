@@ -17,6 +17,6 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.use("/drops", dropRoutes);
+
 
 export default app;
