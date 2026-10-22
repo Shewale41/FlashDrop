@@ -208,6 +208,47 @@ it("rejects duplicate drop IDs", async () => {
 });
 
 
+it("rejects an empty name when updating a drop", async () => {
+  const response = await request(app)
+    .put(`/drops/${dropId}`)
+    .send({
+      name: "   ",
+      availableInventory: 10,
+    });
+
+  expect(response.status).toBe(400);
+});
+
+it("rejects negative inventory when updating a drop", async () => {
+  const response = await request(app)
+    .put(`/drops/${dropId}`)
+    .send({
+      name: "Valid Name",
+      availableInventory: -1,
+    });
+
+  expect(response.status).toBe(400);
+});
+
+it("returns 404 when deleting a nonexistent drop", async () => {
+  const response = await request(app)
+    .delete(`/drops/nonexistent-${randomUUID()}`);
+
+  expect(response.status).toBe(404);
+});
+
+it("returns 400 when updating with invalid inventory", async () => {
+  const response = await request(app)
+    .put(`/drops/${dropId}`)
+    .send({
+      name: "Valid Name",
+      availableInventory: 1.5,
+    });
+
+  expect(response.status).toBe(400);
+});
+
+
   
 afterAll(async () => {
   await redisClient.del(cacheKey);
