@@ -115,6 +115,100 @@ it("lists drops", async () => {
   });
 
   
+it("creates a drop with valid input", async () => {
+  const id = `test-create-${randomUUID()}`;
+
+  const response = await request(app)
+    .post("/drops")
+    .send({
+      id,
+      name: "Test Creation Drop",
+      availableInventory: 10,
+    });
+
+  expect(response.status).toBe(201);
+  expect(response.body.id).toBe(id);
+  expect(response.body.name).toBe("Test Creation Drop");
+  expect(response.body.available_inventory).toBe(10);
+
+  await pool.query("DELETE FROM drops WHERE id = $1", [id]);
+});
+
+it("rejects a missing drop ID", async () => {
+  const response = await request(app)
+    .post("/drops")
+    .send({
+      name: "Test Drop",
+      availableInventory: 10,
+    });
+
+  expect(response.status).toBe(400);
+});
+
+it("rejects an empty drop name", async () => {
+  const response = await request(app)
+    .post("/drops")
+    .send({
+      id: `test-${randomUUID()}`,
+      name: "   ",
+      availableInventory: 10,
+    });
+
+  expect(response.status).toBe(400);
+});
+
+it("rejects negative inventory", async () => {
+  const response = await request(app)
+    .post("/drops")
+    .send({
+      id: `test-${randomUUID()}`,
+      name: "Invalid Inventory Drop",
+      availableInventory: -1,
+    });
+
+  expect(response.status).toBe(400);
+});
+
+it("rejects fractional inventory", async () => {
+  const response = await request(app)
+    .post("/drops")
+    .send({
+      id: `test-${randomUUID()}`,
+      name: "Fractional Inventory Drop",
+      availableInventory: 1.5,
+    });
+
+  expect(response.status).toBe(400);
+});
+
+it("rejects duplicate drop IDs", async () => {
+  const id = `test-duplicate-${randomUUID()}`;
+
+  const first = await request(app)
+    .post("/drops")
+    .send({
+      id,
+      name: "First Drop",
+      availableInventory: 5,
+    });
+
+  expect(first.status).toBe(201);
+
+  const second = await request(app)
+    .post("/drops")
+    .send({
+      id,
+      name: "Duplicate Drop",
+      availableInventory: 5,
+    });
+
+  expect(second.status).toBe(409);
+
+  await pool.query("DELETE FROM drops WHERE id = $1", [id]);
+});
+
+
+  
 afterAll(async () => {
   await redisClient.del(cacheKey);
   await pool.query("DELETE FROM drops WHERE id = $1", [dropId]);

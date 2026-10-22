@@ -153,24 +153,97 @@ router.get("/:id", async (req, res) => {
 });
 
 
+
 router.post("/", async (req, res) => {
-  const { id, name, availableInventory } = req.body;
+  const { id, name, availableInventory } = req.body ?? {};
 
-  const addedRow = await pool.query(
-    `INSERT INTO drops (id, name, available_inventory)
-     VALUES ($1, $2, $3)
-     RETURNING *`,
-    [id, name, availableInventory]
-  );
+  // Validate the ID.
+  if (
+    typeof id !== "string" ||
+    id.trim().length === 0 ||
+    id.length > 100
+  ) {
+    return res.status(400).json({
+      message: "A valid drop ID is required",
+    });
+  }
 
-  console.log(addedRow);
+  // Validate the name.
+  if (
+    typeof name !== "string" ||
+    name.trim().length === 0 ||
+    name.length > 200
+  ) {
+    return res.status(400).json({
+      message: "A valid drop name is required",
+    });
+  }
 
-  return res.status(201).json(addedRow.rows[0]);
+  // Inventory must be a non-negative integer.
+  if (
+    !Number.isSafeInteger(availableInventory) ||
+    availableInventory < 0
+  ) {
+    return res.status(400).json({
+      message: "availableInventory must be a non-negative integer",
+    });
+  }
+
+  try {
+    const addedRow = await pool.query(
+      `INSERT INTO drops (id, name, available_inventory)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [id.trim(), name.trim(), availableInventory]
+    );
+
+    return res.status(201).json(addedRow.rows[0]);
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "23505"
+    ) {
+      return res.status(409).json({
+        message: "A drop with this ID already exists",
+      });
+    }
+
+    console.error("Failed to create drop:", error);
+
+    return res.status(500).json({
+      message: "Failed to create drop",
+    });
+  }
 });
+
+
 
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, availableInventory } = req.body;
+  const { name, availableInventory } = req.body ?? {};
+
+  if (typeof id !== "string" || id.trim().length === 0) {
+    return res.status(400).json({ message: "A valid drop ID is required" });
+  }
+
+  if (
+    typeof name !== "string" ||
+    name.trim().length === 0 ||
+    name.length > 200
+  ) {
+    return res.status(400).json({ message: "A valid drop name is required" });
+  }
+
+  if (
+    !Number.isSafeInteger(availableInventory) ||
+    availableInventory < 0
+  ) {
+    return res.status(400).json({
+      message: "availableInventory must be a non-negative integer",
+    });
+  }
 
   try {
     const updatedRow = await pool.query(
@@ -179,55 +252,64 @@ router.put("/:id", async (req, res) => {
            available_inventory = $2
        WHERE id = $3
        RETURNING *`,
-      [name, availableInventory, id]
+      [name.trim(), availableInventory, id]
     );
 
     if (updatedRow.rows.length === 0) {
-      return res.status(404).json({
-        message: "Drop not found",
-      });
+      return res.status(404).json({ message: "Drop not found" });
     }
 
     const updatedDrop = updatedRow.rows[0];
     const cacheKey = `flashdrop:drop:${id}`;
 
-    // Invalidate the cache after PostgreSQL succeeds.
     try {
       await redisClient.del(cacheKey);
-      console.log("CACHE INVALIDATED:", cacheKey);
     } catch (error) {
-      // The database update succeeded, so don't misreport it as failed.
       console.error("Cache invalidation failed:", error);
     }
 
     return res.status(200).json(updatedDrop);
   } catch (error) {
     console.error("Failed to update drop:", error);
-
-    return res.status(500).json({
-      message: "Failed to update drop",
-    });
+    return res.status(500).json({ message: "Failed to update drop" });
   }
 });
+
+
 
 router.delete("/:id", async (req, res) => {
-  const id = req.params.id;
+  const { id } = req.params;
 
-  const deletedRow = await pool.query(
-    "DELETE FROM drops WHERE id = $1 RETURNING *",
-    [id]
-  );
-
-  if (deletedRow.rows.length === 0) {
-    return res.status(404).json({
-      message: "Drop not found",
-    });
+  if (typeof id !== "string" || id.trim().length === 0) {
+    return res.status(400).json({ message: "A valid drop ID is required" });
   }
 
-  res.status(200).json({
-    message: "Drop deleted successfully",
-    drop: deletedRow.rows[0],
-  });
+  try {
+    const deletedRow = await pool.query(
+      "DELETE FROM drops WHERE id = $1 RETURNING *",
+      [id]
+    );
+
+    if (deletedRow.rows.length === 0) {
+      return res.status(404).json({ message: "Drop not found" });
+    }
+
+    // Invalidate cached data for this drop.
+    try {
+      await redisClient.del(`flashdrop:drop:${id}`);
+    } catch (error) {
+      console.error("Cache invalidation failed:", error);
+    }
+
+    return res.status(200).json({
+      message: "Drop deleted successfully",
+      drop: deletedRow.rows[0],
+    });
+  } catch (error) {
+    console.error("Failed to delete drop:", error);
+    return res.status(500).json({ message: "Failed to delete drop" });
+  }
 });
+
 
 export default router;
