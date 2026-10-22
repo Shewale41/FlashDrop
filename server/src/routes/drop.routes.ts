@@ -25,18 +25,59 @@ const router = Router();
 
 
 
-router.get("/", async (_req, res) => {
+
+router.get("/", async (req, res) => {
+  const limitParam = req.query.limit;
+  const offsetParam = req.query.offset;
+
+  const requestedLimit =
+    typeof limitParam === "string" ? Number(limitParam) : 20;
+
+  const offset =
+    typeof offsetParam === "string" ? Number(offsetParam) : 0;
+
+  if (
+    !Number.isInteger(requestedLimit) ||
+    requestedLimit < 1 ||
+    !Number.isInteger(offset) ||
+    offset < 0
+  ) {
+    return res.status(400).json({
+      message: "limit must be a positive integer and offset must be a non-negative integer",
+    });
+  }
+
+  // Cap page size to prevent excessively large responses.
+  const limit = Math.min(requestedLimit, 100);
+
   try {
-    const result = await pool.query("SELECT * FROM drops");
-    return res.status(200).json(result.rows);
+    const result = await pool.query(
+      `SELECT * FROM drops
+       ORDER BY id
+       LIMIT $1 OFFSET $2`,
+      [limit + 1, offset]
+    );
+
+    // Fetch one extra row to determine whether another page exists.
+    const hasMore = result.rows.length > limit;
+    const drops = hasMore ? result.rows.slice(0, limit) : result.rows;
+
+    return res.status(200).json({
+      data: drops,
+      pagination: {
+        limit,
+        offset,
+        hasMore,
+      },
+    });
   } catch (error) {
     console.error("Failed to fetch drops:", error);
-
     return res.status(500).json({
       message: "Failed to fetch drops",
     });
   }
 });
+
 
 
 

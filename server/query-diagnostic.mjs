@@ -9,25 +9,28 @@ const pool = new pg.Pool({
 });
 
 try {
-  console.time("connect");
+  console.time("Database connection");
   const client = await pool.connect();
-  console.timeEnd("connect");
+  console.timeEnd("Database connection");
 
   try {
-    console.time("select");
+    console.time("Fetch 1000 rows");
 
-    const result = await client.query(
-  "SELECT * FROM drops LIMIT 5"
-);
+    const result = await client.query("SELECT 1 AS test");
 
-    console.timeEnd("select");
-    console.log("Rows returned:", result.rowCount);
-    console.log(result.rows);
+    console.timeEnd("Fetch 1000 rows");
+
+    const sizeMB = (
+      Buffer.byteLength(JSON.stringify(result.rows)) /
+      (1024 * 1024)
+    ).toFixed(2);
+
+   console.log("Query result:", result.rows);
   } finally {
     client.release();
   }
 } catch (error) {
-  console.error("DIAGNOSTIC FAILED:", error);
+  console.error("Diagnostic failed:", error);
 } finally {
   await pool.end();
 }

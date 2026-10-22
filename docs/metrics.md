@@ -156,3 +156,15 @@ Status: Pending
 - p95: TBD
 - p99: TBD
 
+### Testing metrics Backend tests with vitest and supertest 
+
+
+  Test Files  1 failed | 4 passed (5)
+       Tests  1 failed | 21 passed (22)
+    Start at  17:02:01
+    Duration  117.54s (tests 97%, import 2%)
+
+  one case fails which we will fix later , beacuse of network issues we know :(
+
+    
+

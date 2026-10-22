@@ -26,14 +26,28 @@ describe("Drops API", () => {
     );
   });
 
-  it("lists drops", async () => {
-    const response = await request(app).get("/drops");
+  
+it("lists drops", async () => {
+  const response = await request(app)
+    .get("/drops?limit=20&offset=0");
 
-    expect(response.status).toBe(200);
-    expect(Array.isArray(response.body)).toBe(true);
-    expect(response.body.some((drop: { id: string }) => drop.id === dropId))
-      .toBe(true);
+  expect(response.status).toBe(200);
+  expect(Array.isArray(response.body.data)).toBe(true);
+  expect(response.body.data.length).toBeLessThanOrEqual(20);
+
+  expect(
+    response.body.data.some(
+      (drop: { id: string }) => drop.id === dropId
+    )
+  ).toBe(true);
+
+  expect(response.body.pagination).toEqual({
+    limit: 20,
+    offset: 0,
+    hasMore: expect.any(Boolean),
   });
+});
+
 
   it("fetches a drop by ID", async () => {
     const response = await request(app).get(`/drops/${dropId}`);

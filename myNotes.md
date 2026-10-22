@@ -281,3 +281,26 @@ Redis
 27. cache stampede
  - Multiple requests arrive after the cache expires and all try PostgreSQL before one repopulates Redis.
    This is called a cache stampede.  
+
+28. Pagination (haha we already know this from pokemon app yey )
+ - Dividing large data values in small sets like having 10000 records and in each request returning only 20 and then on next request returning next 20 from that on 
+ - Offset is the number of records to skip
+ - Limit is the number of records to return 
+ -  For example:
+  Reques                           	Meaning
+   GET /drops?limit=20&offset=0 	  First 20 drops
+   GET /drops?limit=20&offset=20	  Next 20 drops
+   GET /drops?limit=20&offset=40  	Next 20 drops
+
+
+   on the api level we can do it by 
+      PostgreSQL supports this directly:
+SELECT *
+FROM drops
+ORDER BY id
+LIMIT 20 OFFSET 40;
+
+
+LIMIT 20 returns at most 20 rows. OFFSET 40 skips the first 40 rows.
+
+29.   
