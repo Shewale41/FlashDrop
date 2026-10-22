@@ -5,27 +5,30 @@ import pg from "pg";
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   connectionTimeoutMillis: 15000,
-  query_timeout: 10000,
+  query_timeout: 15000,
 });
 
 try {
-  console.time("Database connection");
+  console.time("Acquire pooled connection");
   const client = await pool.connect();
-  console.timeEnd("Database connection");
+  console.timeEnd("Acquire pooled connection");
 
   try {
-    console.time("Fetch 1000 rows");
+    
+for (let i = 1; i <= 5; i++) {
+  console.time(`SELECT 1 — run ${i}`);
+  await client.query("SELECT 1");
+  console.timeEnd(`SELECT 1 — run ${i}`);
+}
 
-    const result = await client.query("SELECT 1 AS test");
 
-    console.timeEnd("Fetch 1000 rows");
+    console.time("Fetch 20 drops");
+    const result = await client.query(
+      "SELECT * FROM drops ORDER BY id LIMIT 20"
+    );
+    console.timeEnd("Fetch 20 drops");
 
-    const sizeMB = (
-      Buffer.byteLength(JSON.stringify(result.rows)) /
-      (1024 * 1024)
-    ).toFixed(2);
-
-   console.log("Query result:", result.rows);
+    console.log("Rows returned:", result.rowCount);
   } finally {
     client.release();
   }

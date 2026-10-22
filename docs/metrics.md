@@ -168,3 +168,79 @@ Status: Pending
 
     
 
+## Paginated GET /drops — k6 Performance Baseline
+
+### Test Configuration
+- Endpoint: `GET /drops?limit=20&offset=0`
+- Load tool: k6
+- Virtual users: 1
+- Test duration: 30 seconds
+- Sleep between iterations: 2 seconds
+- Page size: 20 drops
+- Database: Neon PostgreSQL
+- Environment: Local API server with remote database
+
+### Successful Run (Manual Warm-up Before k6)
+
+A manual request was sent using PowerShell immediately before running k6.
+
+| Metric | Result |
+|---|---:|
+| Requests completed | 12 |
+| Average latency | 582.19 ms |
+| Median latency (p50) | 565.13 ms |
+| 90th percentile latency (p90) | 650.24 ms |
+| 95th percentile latency (p95) | 702.86 ms |
+| Minimum latency | 529.67 ms |
+| Maximum latency | 760.76 ms |
+| HTTP failure rate | 0% |
+| Checks passed | 36/36 (100%) |
+| Request rate | 0.387 requests/sec |
+
+### Thresholds
+- `http_req_failed < 1%`: PASSED
+- `http_req_duration p95 < 1000 ms`: PASSED
+- `checks rate > 99%`: PASSED
+
+### Comparison Runs
+
+Repeated runs without a manual warm-up frequently missed the p95 target.
+
+| Run | Average latency | Median latency | p95 latency | Maximum latency | HTTP failures |
+|---|---:|---:|---:|---:|---:|
+| Initial run | 1.19 s | 565.49 ms | 4.07 s | 6.89 s | 0% |
+| Subsequent run | 2.14 s | 878.26 ms | 6.85 s | 9.35 s | 0% |
+| Another run | Not recorded | Not recorded | 3.54 s | Not recorded | 0% |
+
+### Server-Side Timing Investigation
+
+Temporary instrumentation measured database-query duration and total API response duration.
+
+| Observation | Database query | Total API duration |
+|---|---:|---:|
+| First request in one run | 9.474 s | 9.484 s |
+| First request after manual warm-up attempt | 5.326 s | 5.336 s |
+| Typical subsequent requests in observed runs | ~0.49–0.79 s | ~0.50–0.79 s |
+
+A separate diagnostic using a fresh PostgreSQL connection pool measured:
+- Connection acquisition: 4.636 s
+- Five sequential `SELECT 1` queries: 611.726 ms, 1.638 s, 711.358 ms, 507.057 ms, 511.336 ms
+- Fetching 20 drops: 532.607 ms
+
+### Findings and Limitations
+- Pagination returns the expected response structure and passed the associated automated tests.
+- The successful warmed-up k6 run met the initial p95 target of less than one second.
+- Other runs showed substantial latency variability and missed the p95 target.
+- Server-side timings closely tracked database-query timings, suggesting database access is a major contributor to observed request latency.
+- A manual request before k6 was associated with better results, but the precise cause of the first-request delay has not been confirmed.
+- The diagnostic used a fresh pool; its connection-acquisition time is not representative of every request handled by the running API's existing pool.
+- These measurements are from a low-load, single-VU test. They do not establish multi-user capacity or production performance.
+- No verified performance improvement from a database or connection-pool optimization has been established yet.
+
+### Status
+Pagination implementation and initial performance baseline: complete.
+
+Database connection/query latency variability: observed; root cause unresolved.
+
+The successful warmed-up result is a single measured run and should not be treated as representative performance without further testing.
+

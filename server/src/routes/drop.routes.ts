@@ -27,6 +27,17 @@ const router = Router();
 
 
 router.get("/", async (req, res) => {
+
+//   const requestStartedAt = performance.now();
+
+// res.on("finish", () => {
+//   console.log(
+//     `GET /drops total: ${(
+//       performance.now() - requestStartedAt
+//     ).toFixed(2)} ms | status: ${res.statusCode}`
+//   );
+// });  //code above this is for tesing the time of the api okei
+
   const limitParam = req.query.limit;
   const offsetParam = req.query.offset;
 
@@ -51,12 +62,16 @@ router.get("/", async (req, res) => {
   const limit = Math.min(requestedLimit, 100);
 
   try {
-    const result = await pool.query(
-      `SELECT * FROM drops
-       ORDER BY id
-       LIMIT $1 OFFSET $2`,
-      [limit + 1, offset]
-    );
+    // console.time("GET /drops DB query"); //JUST FOR THE TESTING purpose of the k6 and testing the time before
+
+const result = await pool.query(
+  `SELECT * FROM drops
+   ORDER BY id
+   LIMIT $1 OFFSET $2`,
+  [limit + 1, offset]
+);
+
+// console.timeEnd("GET /drops DB query"); //just for the testing purpose , testing the time after
 
     // Fetch one extra row to determine whether another page exists.
     const hasMore = result.rows.length > limit;
