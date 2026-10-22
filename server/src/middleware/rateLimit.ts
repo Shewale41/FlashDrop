@@ -46,12 +46,11 @@ export async function rateLimit(
     }
 
     next();
-  } catch (error) {
-    console.error("Rate limiter Redis error:", error);
+  }  catch (error) {
+  console.error("Rate limiter Redis error:", error);
 
-    // Fail closed: do not allow requests when the limit cannot be checked.
-    return res.status(503).json({
-      message: "Request protection is temporarily unavailable.",
-    });
-  }
+  // Temporary fail-open behavior:
+  // keep the API available when Redis is unavailable.
+  return next();
+}
 }
