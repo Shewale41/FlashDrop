@@ -11,13 +11,13 @@ import request from "supertest";
 import { randomUUID } from "node:crypto";
 import app from "../app.ts";
 import pool from "../db/index.ts";
-import redisClient from "../db/redis.ts";
-
+import redisClient, { connectRedis } from "../db/redis.ts";
 const dropId = `test-drop-${randomUUID()}`;
 const cacheKey = `flashdrop:drop:${dropId}`;
 
 describe("Drops API", () => {
   beforeAll(async () => {
+    await connectRedis();
     // Create isolated test data directly in PostgreSQL.
     await pool.query(
       `INSERT INTO drops (id, name, available_inventory)
