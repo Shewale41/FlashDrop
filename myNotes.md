@@ -303,4 +303,9 @@ LIMIT 20 OFFSET 40;
 
 LIMIT 20 returns at most 20 rows. OFFSET 40 skips the first 40 rows.
 
-29.   
+29. Docker
+ -Dcoker has it's own cache so keep all the heavy commands on the top of the dockerfile
+    and keep the changing or developing / modifying files or dependencies at the bottom of the dockerfile
+      so that the initial not changing can hit the cache and save time & energy .
+      -also when it misses an docker command then it will take all the below commands of that miss command as new command in the 
+        docker file even if they are not changed , docker runs on order of dockerfile
