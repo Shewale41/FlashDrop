@@ -1,0 +1,17 @@
+
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmitOnError": true
+  },
+  "exclude": [
+    "src/tests",
+    "src/db/redis-test.ts",
+    "src/db/transaction-a.ts",
+    "src/db/transaction-b.ts",
+    "src/db/transaction-test.ts",
+    "src/db/*benchmark.ts"
+  ]
+}
