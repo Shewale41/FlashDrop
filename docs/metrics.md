@@ -244,3 +244,61 @@ Database connection/query latency variability: observed; root cause unresolved.
 
 The successful warmed-up result is a single measured run and should not be treated as representative performance without further testing.
 
+
+## Docker Build and Image Baseline
+
+**Measurement date:** October 2026  
+**Project:** FlashDrop API  
+**Environment:** Windows, Docker Compose, Node.js 24 multi-stage Dockerfile
+
+### Image measurements
+
+| Metric | Measured value |
+|---|---:|
+| API image tag | `server-api:latest` |
+| Docker-reported disk usage | 360 MB |
+| Docker-reported content size | 84 MB |
+| Production dependency installation layer | 26.8 MB |
+| Compiled `dist/` layer | 143 kB |
+
+Note: Docker-reported disk usage and content size are distinct
+metrics. Preserve the labels when reporting these measurements.
+
+### Build duration
+
+| Build condition | Duration |
+|---|---:|
+| Cached `docker compose build api` | 6.99 seconds |
+| Uncached `docker compose build --no-cache api` | 46.80 seconds |
+| Difference in this run | 39.81 seconds |
+
+The cached build took approximately 85.1% less wall-clock time
+than the uncached build in this single comparison.
+
+**Caveat:** This compares cached and uncached builds, not the
+old and new Dockerfiles. Results may vary with network speed,
+dependency downloads, machine load, and Docker cache state.
+Repeat measurements before treating this as a stable benchmark.
+
+### Runtime verification
+
+- `docker compose ps`: API running; Redis healthy.
+- `docker compose logs --tail 50 api`: Redis connected.
+- `GET /health`: returned `{"status":"ok"}`.
+
+### Interpretation and next measurements
+
+The multi-stage build separates compilation from the production
+runtime image. The runtime stage installs production dependencies
+and copies compiled JavaScript from the builder stage.
+
+The current measurements establish a baseline, but do not prove
+a percentage reduction in image size or build time versus the
+previous Dockerfile.
+
+Next:
+- Measure startup-to-health-check duration across repeated runs.
+- Preserve an old image or rebuild the old Dockerfile for a
+  fair before/after image-size comparison.
+- Repeat cached and uncached build measurements.
+- Record Docker image size and disk usage as separate metrics.
