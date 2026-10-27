@@ -302,3 +302,6 @@ Next:
   fair before/after image-size comparison.
 - Repeat cached and uncached build measurements.
 - Record Docker image size and disk usage as separate metrics.
+
+# Image size reduced 
+  -from 450 to 350 mb more than 20% reduction
