@@ -309,3 +309,19 @@ LIMIT 20 returns at most 20 rows. OFFSET 40 skips the first 40 rows.
       so that the initial not changing can hit the cache and save time & energy .
       -also when it misses an docker command then it will take all the below commands of that miss command as new command in the 
         docker file even if they are not changed , docker runs on order of dockerfile
+
+30. Scale to Zero
+ - Suppose we hit a request and no request for 5 minutes then the neon or service will suspend that compute / cpu till
+  that inactivity . If there is no activity for 5 minutes then shutdown that's why we took so much time to connect to 
+    neon db . 
+ - instead of paying to keep a database server running when nobody uses it, Neon suspends its compute.
+
+31. Pg Bouncer 
+ Without a connection pooler:
+- Many application connections may try to connect directly to PostgreSQL.
+- PostgreSQL has to manage those connections.
+- Connection establishment and resource usage can become expensive.
+With PgBouncer:
+- Applications connect to PgBouncer.
+- PgBouncer manages a pool of actual PostgreSQL connections.
+- It can reuse database connections for multiple application clients. 

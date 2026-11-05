@@ -26,17 +26,9 @@ const router = Router();
 
 
 
+
 router.get("/", async (req, res) => {
-
-//   const requestStartedAt = performance.now();
-
-// res.on("finish", () => {
-//   console.log(
-//     `GET /drops total: ${(
-//       performance.now() - requestStartedAt
-//     ).toFixed(2)} ms | status: ${res.statusCode}`
-//   );
-// });  //code above this is for tesing the time of the api okei
+  const requestStartedAt = performance.now();
 
   const limitParam = req.query.limit;
   const offsetParam = req.query.offset;
@@ -54,28 +46,53 @@ router.get("/", async (req, res) => {
     offset < 0
   ) {
     return res.status(400).json({
-      message: "limit must be a positive integer and offset must be a non-negative integer",
+      message:
+        "limit must be a positive integer and offset must be a non-negative integer",
     });
   }
 
-  // Cap page size to prevent excessively large responses.
   const limit = Math.min(requestedLimit, 100);
 
   try {
-    // console.time("GET /drops DB query"); //JUST FOR THE TESTING purpose of the k6 and testing the time before
+    const connectionStartedAt = performance.now();
 
-const result = await pool.query(
-  `SELECT * FROM drops
-   ORDER BY id
-   LIMIT $1 OFFSET $2`,
-  [limit + 1, offset]
-);
+const client = await pool.connect();
 
-// console.timeEnd("GET /drops DB query"); //just for the testing purpose , testing the time after
+const connectionTime = performance.now() - connectionStartedAt;
 
-    // Fetch one extra row to determine whether another page exists.
+let result;
+let queryDuration = 0;
+
+try {
+  const queryStartedAt = performance.now();
+
+  result = await client.query(
+    `SELECT * FROM drops
+     ORDER BY id
+     LIMIT $1 OFFSET $2`,
+    [limit + 1, offset]
+  );
+
+  const queryDuration = performance.now() - queryStartedAt;
+
+  console.log(
+    `[DB PERF] connection=${connectionTime.toFixed(2)}ms` +
+    ` | execution+roundtrip=${queryDuration.toFixed(2)}ms`
+  );
+} finally {
+  client.release();
+}
+
     const hasMore = result.rows.length > limit;
     const drops = hasMore ? result.rows.slice(0, limit) : result.rows;
+
+    res.on("finish", () => {
+      console.log(
+        `[PERF] GET /drops | query=${queryDuration.toFixed(2)}ms` +
+        ` | total=${(performance.now() - requestStartedAt).toFixed(2)}ms` +
+        ` | rows=${drops.length} | status=${res.statusCode}`
+      );
+    });
 
     return res.status(200).json({
       data: drops,
@@ -92,6 +109,7 @@ const result = await pool.query(
     });
   }
 });
+
 
 
 

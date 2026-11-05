@@ -305,3 +305,36 @@ Next:
 
 # Image size reduced 
   -from 450 to 350 mb more than 20% reduction
+
+
+## Load Test — Paginated Drops API Baseline
+
+**Date:** October 2026  
+**Tool:** k6 v2.2.0  
+**Endpoint:** GET /drops?limit=20&offset=0  
+**Virtual users:** 1  
+**Configured duration:** 30 seconds  
+**Inter-request sleep:** 2 seconds  
+**Observed requests:** 7
+
+| Metric | Observed result |
+|---|---:|
+| Average HTTP latency | 2.55 s |
+| p50 latency | 635.04 ms |
+| p90 latency | 6.52 s |
+| p95 latency | 8.98 s |
+| Maximum latency | 11.45 s |
+| HTTP failures | 0 of 7 |
+| Checks passed | 21 of 21 |
+| Observed throughput | 0.219 requests/sec |
+
+**Threshold outcome:** Failed the p95 target of less than 1,000 ms.
+
+**Interpretation:** All observed responses passed the HTTP and
+pagination checks, but latency showed substantial variability.
+The sample is too small for a reliable tail-latency estimate.
+
+**Next investigation:** Repeat the same workload and inspect API
+logs to determine whether latency spikes recur. Do not attribute
+the delays to PostgreSQL, Redis, or networking until supported
+by further measurements.
