@@ -338,3 +338,40 @@ The sample is too small for a reliable tail-latency estimate.
 logs to determine whether latency spikes recur. Do not attribute
 the delays to PostgreSQL, Redis, or networking until supported
 by further measurements.
+
+## Neon PostgreSQL — Cold vs Warm Request Latency
+
+**Date:** November 5, 2026  
+**Environment:** Docker Compose (API + Redis), Neon PostgreSQL Free  
+**Connection:** Neon pooled endpoint (`-pooler`)  
+**Compute:** 0.25–2 CU  
+**Scale-to-zero:** 5 minutes  
+**Endpoint:** `GET /drops?limit=20&offset=0`  
+**Test:** One request after at least 6 minutes of database inactivity, followed immediately by a second request.
+
+### Results
+
+| Metric | Cold request | Warm request |
+|---|---:|---:|
+| Total HTTP request time | 10,812.25 ms | 3,020.01 ms |
+| Connection acquisition | 10,089.58 ms | 0.05 ms |
+| Query + round-trip | 719.40 ms | 3,018.89 ms |
+| Rows returned | 20 | 20 |
+| HTTP status | 200 | 200 |
+
+### Findings
+
+- The cold request spent approximately 10.09 seconds acquiring a PostgreSQL connection.
+- The immediately following request acquired a connection in 0.05 ms, indicating successful connection reuse.
+- Query + round-trip latency varied significantly between the two requests.
+- The pooled endpoint does not eliminate Neon scale-to-zero activation delays.
+- Connection acquisition and database round-trip latency must be measured separately.
+
+### Limitations
+
+- These are two individual observations, not a statistically meaningful p95.
+- Query timing includes database and network round-trip time; it is not pure PostgreSQL execution time.
+- The measurements do not isolate the exact cause of connection acquisition delay.
+- No claim of consistent warm-request latency is made.
+
+**Decision:** Retain Neon Free and its existing pooled connection configuration. Accept occasional cold starts during development. Do not send artificial keep-alive requests to avoid suspension.
