@@ -325,3 +325,7 @@ With PgBouncer:
 - Applications connect to PgBouncer.
 - PgBouncer manages a pool of actual PostgreSQL connections.
 - It can reuse database connections for multiple application clients. 
+
+32. cold and warm request 
+ - Cold start = infrastructure needs to become available. server chalu karne wala request / first request - slow beacuse neend se uthata hai
+ - Warm request = infrastructure and connection are already available. chalu server hone pe fastest request / second request - fast becz server ab uth chuka hai

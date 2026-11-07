@@ -8,6 +8,22 @@ const router = Router();
 
 
 router.post("/", authenticate, async (req, res) => {
+  router.post("/", authenticate, async (req, res) => {
+  const { dropId } = req.body;
+
+  if (!req.user) {
+    return res.status(401).json({
+      message: "Not authenticated",
+    });
+  }
+
+  if (typeof dropId !== "string" || !dropId.trim()) {
+    return res.status(400).json({
+      message: "Drop ID is required",
+    });
+  }
+
+  const { userId } = req.user;
   const client = await pool.connect();
 
   try {
