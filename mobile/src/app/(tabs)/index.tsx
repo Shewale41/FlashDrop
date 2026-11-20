@@ -1,23 +1,32 @@
-
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { Link } from 'expo-router';
 import {
+  ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link } from 'expo-router';
-import { COLORS as C } from '@/constants/flashdrop';
+import { StatusBar } from 'expo-status-bar';
 import { useDrops } from '@/hooks/use-drops';
+
+const T = {
+  bone: '#E9E4D9',
+  ink: '#151B18',
+  sage: '#B7C69A',
+  clay: '#B66C4B',
+  muted: '#77786E',
+  line: '#C9C3B7',
+  paper: '#F0ECE4',
+};
 
 export default function HomeScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useDrops();
   const [refreshing, setRefreshing] = useState(false);
-
   const drops = data?.data ?? [];
 
   async function refresh() {
@@ -28,6 +37,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <StatusBar style="dark" />
       <ScrollView
         style={s.scroll}
         contentContainerStyle={s.content}
@@ -36,70 +46,97 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing || isRefetching}
             onRefresh={refresh}
-            tintColor={C.accent}
+            tintColor={T.clay}
           />
         }
       >
         <View style={s.header}>
           <View>
-            <Text style={s.logo}>flashdrop<Text style={s.dot}>.</Text></Text>
+            <Text style={s.logo}>flashdrop<Text style={s.logoDot}>.</Text></Text>
             <Text style={s.tagline}>THE ART OF THE DROP</Text>
           </View>
           <View style={s.actions}>
-            <Pressable style={s.iconButton}>
-              <Ionicons name="search-outline" size={20} color={C.cream} />
+            <Pressable
+              style={s.iconButton}
+              accessibilityRole="button"
+              accessibilityLabel="Search drops"
+            >
+              <Ionicons name="search-outline" size={19} color={T.ink} />
             </Pressable>
-            <Pressable style={s.iconButton}>
-              <Ionicons name="notifications-outline" size={20} color={C.cream} />
+            <Pressable
+              style={s.iconButton}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+            >
+              <Ionicons name="notifications-outline" size={19} color={T.ink} />
             </Pressable>
           </View>
         </View>
 
-        <View style={s.intro}>
-          <Text style={s.eyebrow}>CURATED RELEASES / 001</Text>
+        <View style={s.campaign}>
+          <View style={s.campaignOutline} />
+          <View style={s.campaignClay} />
+          <View style={s.campaignSage} />
+          <View style={s.campaignTop}>
+            <Text style={s.campaignEyebrow}>FLASHDROP / RELEASE CULTURE</Text>
+            <Ionicons name="sparkles-outline" size={17} color={T.sage} />
+          </View>
           <Text style={s.headline}>
-            Not everything{'\n'}is meant to be{'\n'}
-            <Text style={s.italic}>available.</Text>
+            Every drop{ '\n' }is an{ '\n' }
+            <Text style={s.headlineItalic}>event.</Text>
           </Text>
-          <View style={s.introBottom}>
-            <Text style={s.description}>
-              Limited releases. A fair chance.{'\n'}
+          <View style={s.campaignBottom}>
+            <Text style={s.campaignCopy}>
+              Limited releases. A fair chance.{ '\n' }
               One moment to make it yours.
             </Text>
-            <Ionicons name="arrow-down" size={26} color={C.accent} />
+            <Ionicons name="arrow-down" size={19} color={T.sage} />
           </View>
         </View>
 
         <View style={s.sectionHeading}>
-          <Text style={s.eyebrow}>LIVE FROM THE DATABASE</Text>
-          <Text style={s.sectionTitle}>Available drops.</Text>
+          <View>
+            <Text style={s.sectionEyebrow}>LIVE FROM FLASHDROP</Text>
+            <Text style={s.sectionTitle}>The drops.</Text>
+          </View>
+          <Text style={s.sectionAside}>CURRENT{ '\n' }RELEASES</Text>
         </View>
 
-        {isLoading && (
-          <View style={s.state}>
-            <Text style={s.stateTitle}>Finding the next drop...</Text>
-            <Text style={s.stateText}>Connecting to FlashDrop.</Text>
+        {isLoading ? (
+          <View style={s.state} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={T.clay} size="small" />
+            <View style={s.stateCopy}>
+              <Text style={s.stateTitle}>The next release is opening.</Text>
+              <Text style={s.stateText}>Checking live availability.</Text>
+            </View>
           </View>
-        )}
+        ) : null}
 
-        {isError && (
+        {isError ? (
           <View style={s.state}>
-            <Text style={s.stateTitle}>Couldn't load drops.</Text>
-            <Text style={s.stateText}>
-              Check that your backend is running and try again.
-            </Text>
-            <Pressable onPress={() => refetch()} style={s.retry}>
+            <View style={s.stateCopy}>
+              <Text style={s.stateTitle}>The releases didn’t come through.</Text>
+              <Text style={s.stateText}>Check your connection, then try again.</Text>
+            </View>
+            <Pressable
+              onPress={() => refetch()}
+              style={({ pressed }) => [s.retry, pressed && s.pressed]}
+              accessibilityRole="button"
+            >
               <Text style={s.retryText}>TRY AGAIN</Text>
+              <Ionicons name="arrow-forward" size={16} color={T.bone} />
             </Pressable>
           </View>
-        )}
+        ) : null}
 
-        {!isLoading && !isError && drops.length === 0 && (
+        {!isLoading && !isError && drops.length === 0 ? (
           <View style={s.state}>
-            <Text style={s.stateTitle}>Nothing here. Yet.</Text>
-            <Text style={s.stateText}>New releases will appear here.</Text>
+            <View style={s.stateCopy}>
+              <Text style={s.stateTitle}>Nothing is live right now.</Text>
+              <Text style={s.stateText}>New releases will appear here.</Text>
+            </View>
           </View>
-        )}
+        ) : null}
 
         {drops.map((drop, index) => {
           const soldOut = drop.available_inventory <= 0;
@@ -111,7 +148,7 @@ export default function HomeScreen() {
               asChild
             >
               <Pressable
-                style={s.drop}
+                style={({ pressed }) => [s.drop, pressed && s.dropPressed]}
                 accessibilityRole="button"
                 accessibilityLabel={`View ${drop.name}, ${soldOut ? 'sold out' : `${drop.available_inventory} available`}`}
               >
@@ -119,24 +156,29 @@ export default function HomeScreen() {
                   <Text style={s.dropIndex}>
                     DROP / {String(index + 1).padStart(2, '0')}
                   </Text>
-                  <View style={[s.status, soldOut && s.soldOut]}>
-                    <View style={[s.statusDot, soldOut && s.soldOutDot]} />
-                    <Text style={s.statusText}>
+                  <View style={s.dropStatus}>
+                    <View style={[s.statusDot, soldOut && s.statusDotSoldOut]} />
+                    <Text style={[s.statusText, soldOut && s.statusTextSoldOut]}>
                       {soldOut ? 'SOLD OUT' : 'AVAILABLE'}
                     </Text>
                   </View>
                 </View>
 
-                <Text style={s.dropName}>{drop.name}</Text>
+                <View style={s.dropTitleRow}>
+                  <Text style={s.dropName}>{drop.name}</Text>
+                  <Ionicons name="arrow-forward" size={18} color={T.ink} />
+                </View>
 
                 <View style={s.dropBottom}>
-                  <View>
-                    <Text style={s.label}>REMAINING INVENTORY</Text>
-                    <Text style={s.inventory}>
+                  <View style={s.dropInventory}>
+                    <Text style={s.inventoryLabel}>REMAINING UNITS</Text>
+                    <Text style={[s.inventoryValue, soldOut && s.inventorySoldOut]}>
                       {drop.available_inventory.toLocaleString('en-IN')}
                     </Text>
                   </View>
-                  <Text style={s.dropId}>{drop.id}</Text>
+                  <Text style={s.dropId} numberOfLines={1} ellipsizeMode="middle">
+                    {drop.id}
+                  </Text>
                 </View>
               </Pressable>
             </Link>
@@ -144,7 +186,7 @@ export default function HomeScreen() {
         })}
 
         <View style={s.footer}>
-          <Text style={s.footerLogo}>flashdrop.</Text>
+          <Text style={s.footerLogo}>flashdrop<Text style={s.logoDot}>.</Text></Text>
           <Text style={s.footerCopy}>LESS ACCESS. MORE MEANING.</Text>
         </View>
       </ScrollView>
@@ -153,82 +195,171 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background, width: '100%' },
+  safe: { flex: 1, backgroundColor: T.bone, width: '100%' },
   scroll: { flex: 1, width: '100%' },
-  content: { flexGrow: 1, paddingHorizontal: 22, paddingBottom: 35 },
+  content: { flexGrow: 1, paddingHorizontal: 22, paddingBottom: 28 },
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingVertical: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 13,
+    paddingBottom: 17,
   },
-  logo: { color: C.cream, fontSize: 27, fontWeight: '800', letterSpacing: -1.8 },
-  dot: { color: C.accent },
-  tagline: { color: C.muted, fontSize: 8, letterSpacing: 2.2, marginTop: 3 },
-  actions: { flexDirection: 'row', gap: 10 },
+  logo: { color: T.ink, fontSize: 26, fontWeight: '800', letterSpacing: -1.7 },
+  logoDot: { color: T.clay },
+  tagline: { color: T.muted, fontSize: 8, letterSpacing: 2, marginTop: 2 },
+  actions: { flexDirection: 'row', gap: 9 },
   iconButton: {
-    width: 42, height: 42, borderWidth: 1, borderColor: C.border,
-    borderRadius: 24, alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#B8B2A7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  intro: { paddingTop: 38, paddingBottom: 35 },
-  eyebrow: { color: C.accent, fontSize: 9, letterSpacing: 2.1, fontWeight: '700' },
+  campaign: {
+    minHeight: 330,
+    marginHorizontal: -22,
+    paddingHorizontal: 22,
+    paddingTop: 21,
+    paddingBottom: 21,
+    backgroundColor: T.ink,
+    overflow: 'hidden',
+    justifyContent: 'space-between',
+  },
+  campaignOutline: {
+    position: 'absolute',
+    width: 186,
+    height: 186,
+    borderWidth: 1,
+    borderColor: 'rgba(183, 198, 154, 0.38)',
+    borderRadius: 93,
+    right: 12,
+    bottom: 28,
+  },
+  campaignClay: {
+    position: 'absolute',
+    width: 126,
+    height: 198,
+    right: -42,
+    bottom: 27,
+    backgroundColor: T.clay,
+    borderTopLeftRadius: 90,
+    borderTopRightRadius: 90,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    transform: [{ rotate: '19deg' }],
+  },
+  campaignSage: {
+    position: 'absolute',
+    width: 69,
+    height: 69,
+    right: 80,
+    bottom: 115,
+    backgroundColor: T.sage,
+    borderRadius: 35,
+  },
+  campaignTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  campaignEyebrow: { color: T.sage, fontSize: 8, letterSpacing: 1.8, fontWeight: '700' },
   headline: {
-    color: C.cream, fontSize: 43, lineHeight: 48,
-    fontWeight: '600', letterSpacing: -2.2, marginTop: 17,
+    color: T.bone,
+    fontFamily: 'serif',
+    fontSize: 43,
+    lineHeight: 45,
+    letterSpacing: -1.6,
+    marginTop: 20,
+    alignSelf: 'flex-start',
   },
-  italic: { color: C.accent, fontStyle: 'italic', fontWeight: '400' },
-  introBottom: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    justifyContent: 'space-between', marginTop: 19,
+  headlineItalic: { color: T.sage, fontStyle: 'italic' },
+  campaignBottom: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 18,
+    paddingRight: 2,
   },
-  description: { color: C.muted, fontSize: 13, lineHeight: 21 },
-  sectionHeading: { marginBottom: 17 },
+  campaignCopy: { color: '#C6C6BA', fontSize: 11, lineHeight: 17 },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingTop: 31,
+    paddingBottom: 14,
+  },
+  sectionEyebrow: { color: T.clay, fontSize: 8, letterSpacing: 1.6, fontWeight: '800' },
   sectionTitle: {
-    color: C.cream, fontSize: 27, fontWeight: '500',
-    letterSpacing: -1, marginTop: 9,
+    color: T.ink,
+    fontFamily: 'serif',
+    fontSize: 32,
+    lineHeight: 38,
+    letterSpacing: -0.8,
+    marginTop: 4,
   },
+  sectionAside: { color: T.muted, fontSize: 7, lineHeight: 11, letterSpacing: 1.3, textAlign: 'right', marginBottom: 4 },
   state: {
-    padding: 24, backgroundColor: C.surface,
-    borderRadius: 5, marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 23,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: T.line,
   },
-  stateTitle: { color: C.cream, fontSize: 17, fontWeight: '600' },
-  stateText: { color: C.muted, fontSize: 12, lineHeight: 19, marginTop: 8 },
+  stateCopy: { flex: 1 },
+  stateTitle: { color: T.ink, fontFamily: 'serif', fontSize: 20, lineHeight: 25 },
+  stateText: { color: T.muted, fontSize: 11, lineHeight: 17, marginTop: 5 },
   retry: {
-    marginTop: 18, backgroundColor: C.accent,
-    padding: 13, alignSelf: 'flex-start',
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 13,
+    backgroundColor: T.ink,
   },
-  retryText: { color: C.background, fontWeight: '800', fontSize: 10 },
+  retryText: { color: T.bone, fontSize: 8, fontWeight: '800', letterSpacing: 1 },
+  pressed: { opacity: 0.7 },
   drop: {
-    backgroundColor: C.surface, padding: 19,
-    marginBottom: 13, borderRadius: 4,
+    paddingTop: 17,
+    paddingBottom: 18,
+    borderTopWidth: 1,
+    borderColor: T.line,
   },
-  dropTop: {
-    flexDirection: 'row', justifyContent: 'space-between',
+  dropPressed: { opacity: 0.62 },
+  dropTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dropIndex: { color: T.muted, fontSize: 8, letterSpacing: 1.4, fontWeight: '700' },
+  dropStatus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { height: 6, width: 6, borderRadius: 3, backgroundColor: '#63774D' },
+  statusDotSoldOut: { backgroundColor: T.clay },
+  statusText: { color: T.ink, fontSize: 8, letterSpacing: 1.1, fontWeight: '700' },
+  statusTextSoldOut: { color: T.clay },
+  dropTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 13 },
+  dropName: {
+    flex: 1,
+    color: T.ink,
+    fontFamily: 'serif',
+    fontSize: 24,
+    lineHeight: 29,
+    letterSpacing: -0.4,
+  },
+  dropBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 12 },
+  dropInventory: { flexDirection: 'row', alignItems: 'baseline', gap: 9 },
+  inventoryLabel: { color: T.muted, fontSize: 7, letterSpacing: 1.2, fontWeight: '700' },
+  inventoryValue: { color: T.ink, fontSize: 21, lineHeight: 25, fontWeight: '700', letterSpacing: -0.6 },
+  inventorySoldOut: { color: T.clay },
+  dropId: { color: T.muted, fontSize: 8, letterSpacing: 0.4, maxWidth: 150 },
+  footer: {
+    paddingTop: 27,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderColor: T.line,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  dropIndex: { color: C.muted, fontSize: 9, letterSpacing: 1.5 },
-  status: {
-    backgroundColor: '#29382B', paddingHorizontal: 10,
-    paddingVertical: 7, borderRadius: 20,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-  },
-  soldOut: { backgroundColor: '#392725' },
-  statusDot: { height: 6, width: 6, borderRadius: 3, backgroundColor: C.success },
-  soldOutDot: { backgroundColor: C.danger },
-  statusText: { color: C.cream, fontSize: 8, letterSpacing: 1 },
-  dropName: {
-    color: C.cream, fontSize: 26, fontWeight: '600',
-    letterSpacing: -0.8, marginTop: 27, marginBottom: 24,
-  },
-  dropBottom: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  label: { color: C.muted, fontSize: 8, letterSpacing: 1.2 },
-  inventory: { color: C.accent, fontSize: 23, fontWeight: '600', marginTop: 5 },
-  dropId: { color: C.muted, fontSize: 9 },
-  footer: {
-    paddingTop: 35, flexDirection: 'row',
-    justifyContent: 'space-between', alignItems: 'center',
-  },
-  footerLogo: { color: C.cream, fontSize: 17, fontWeight: '800' },
-  footerCopy: { color: C.muted, fontSize: 8, letterSpacing: 1.1 },
+  footerLogo: { color: T.ink, fontSize: 15, fontWeight: '800', letterSpacing: -0.7 },
+  footerCopy: { color: T.muted, fontSize: 7, letterSpacing: 1 },
 });
