@@ -148,37 +148,44 @@ export default function HomeScreen() {
               asChild
             >
               <Pressable
-                style={({ pressed }) => [s.drop, pressed && s.dropPressed]}
+                style={({ pressed }) => [s.dropPress, pressed && s.dropPressed]}
                 accessibilityRole="button"
                 accessibilityLabel={`View ${drop.name}, ${soldOut ? 'sold out' : `${drop.available_inventory} available`}`}
               >
-                <View style={s.dropTop}>
-                  <Text style={s.dropIndex}>
-                    DROP / {String(index + 1).padStart(2, '0')}
-                  </Text>
-                  <View style={s.dropStatus}>
-                    <View style={[s.statusDot, soldOut && s.statusDotSoldOut]} />
-                    <Text style={[s.statusText, soldOut && s.statusTextSoldOut]}>
-                      {soldOut ? 'SOLD OUT' : 'AVAILABLE'}
+                <View style={[s.drop, soldOut && s.dropSoldOut]}>
+                  <View style={s.dropTop}>
+                    <Text style={s.dropIndex}>
+                      DROP / {String(index + 1).padStart(2, '0')}
+                    </Text>
+                    <View style={[s.dropStatus, soldOut && s.dropStatusSoldOut]}>
+                      <View style={[s.statusDot, soldOut && s.statusDotSoldOut]} />
+                      <Text style={[s.statusText, soldOut && s.statusTextSoldOut]}>
+                        {soldOut ? 'SOLD OUT' : 'AVAILABLE'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={s.dropTitleRow}>
+                    <Text style={s.dropName}>{drop.name}</Text>
+                    <View style={s.glassAction}>
+                      <Ionicons name="arrow-forward" size={16} color={T.ink} />
+                    </View>
+                  </View>
+
+                  <View style={s.dropBottom}>
+                    <View>
+                      <Text style={s.inventoryLabel}>REMAINING UNITS</Text>
+                      <View style={s.dropInventory}>
+                        <Text style={[s.inventoryValue, soldOut && s.inventorySoldOut]}>
+                          {drop.available_inventory.toLocaleString('en-IN')}
+                        </Text>
+                        <Text style={s.unitsText}>UNITS</Text>
+                      </View>
+                    </View>
+                    <Text style={s.dropId} numberOfLines={1} ellipsizeMode="middle">
+                      {drop.id}
                     </Text>
                   </View>
-                </View>
-
-                <View style={s.dropTitleRow}>
-                  <Text style={s.dropName}>{drop.name}</Text>
-                  <Ionicons name="arrow-forward" size={18} color={T.ink} />
-                </View>
-
-                <View style={s.dropBottom}>
-                  <View style={s.dropInventory}>
-                    <Text style={s.inventoryLabel}>REMAINING UNITS</Text>
-                    <Text style={[s.inventoryValue, soldOut && s.inventorySoldOut]}>
-                      {drop.available_inventory.toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                  <Text style={s.dropId} numberOfLines={1} ellipsizeMode="middle">
-                    {drop.id}
-                  </Text>
                 </View>
               </Pressable>
             </Link>
@@ -322,21 +329,48 @@ const s = StyleSheet.create({
   },
   retryText: { color: T.bone, fontSize: 8, fontWeight: '800', letterSpacing: 1 },
   pressed: { opacity: 0.7 },
+  dropPress: { width: '100%' },
   drop: {
-    paddingTop: 17,
-    paddingBottom: 18,
-    borderTopWidth: 1,
-    borderColor: T.line,
+    marginBottom: 14,
+    padding: 18,
+    backgroundColor: '#FBF9F3',
+    borderWidth: 1,
+    borderColor: '#CFC7BA',
+    borderRadius: 10,
+    shadowColor: T.ink,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.085,
+    shadowRadius: 12,
+    elevation: 2,
   },
+  dropSoldOut: { backgroundColor: '#F4ECE5' },
   dropPressed: { opacity: 0.62 },
   dropTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dropIndex: { color: T.muted, fontSize: 8, letterSpacing: 1.4, fontWeight: '700' },
-  dropStatus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dropStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.86)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(183, 198, 154, 0.27)',
+  },
+  dropStatusSoldOut: { backgroundColor: 'rgba(182, 108, 75, 0.13)' },
   statusDot: { height: 6, width: 6, borderRadius: 3, backgroundColor: '#63774D' },
   statusDotSoldOut: { backgroundColor: T.clay },
   statusText: { color: T.ink, fontSize: 8, letterSpacing: 1.1, fontWeight: '700' },
   statusTextSoldOut: { color: T.clay },
-  dropTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 13 },
+  dropTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 13,
+    minHeight: 42,
+  },
   dropName: {
     flex: 1,
     color: T.ink,
@@ -345,12 +379,31 @@ const s = StyleSheet.create({
     lineHeight: 29,
     letterSpacing: -0.4,
   },
-  dropBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 12 },
-  dropInventory: { flexDirection: 'row', alignItems: 'baseline', gap: 9 },
+  glassAction: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.56)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.92)',
+  },
+  dropBottom: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 13,
+    paddingTop: 11,
+    borderTopWidth: 1,
+    borderColor: 'rgba(201, 195, 183, 0.72)',
+  },
+  dropInventory: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
   inventoryLabel: { color: T.muted, fontSize: 7, letterSpacing: 1.2, fontWeight: '700' },
-  inventoryValue: { color: T.ink, fontSize: 21, lineHeight: 25, fontWeight: '700', letterSpacing: -0.6 },
+  inventoryValue: { color: T.ink, fontSize: 25, lineHeight: 29, fontWeight: '700', letterSpacing: -0.8 },
   inventorySoldOut: { color: T.clay },
-  dropId: { color: T.muted, fontSize: 8, letterSpacing: 0.4, maxWidth: 150 },
+  unitsText: { color: T.muted, fontSize: 7, letterSpacing: 1.1 },
+  dropId: { color: T.muted, fontSize: 8, letterSpacing: 0.4, maxWidth: 145, marginBottom: 4 },
   footer: {
     paddingTop: 27,
     marginTop: 4,
