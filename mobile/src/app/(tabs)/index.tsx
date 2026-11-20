@@ -70,6 +70,15 @@ export default function HomeScreen() {
             >
               <Ionicons name="notifications-outline" size={19} color={T.ink} />
             </Pressable>
+            <Link href="/account" asChild>
+              <Pressable
+                style={s.iconButton}
+                accessibilityRole="button"
+                accessibilityLabel="View your account"
+              >
+                <Ionicons name="person-outline" size={19} color={T.ink} />
+              </Pressable>
+            </Link>
           </View>
         </View>
 

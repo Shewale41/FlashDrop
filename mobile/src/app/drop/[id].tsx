@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useDrop } from '@/hooks/use-drop';
+import { useAuth } from '@/context/auth-context';
 
 const T = {
   bone: '#E9E4D9',
@@ -26,6 +27,7 @@ const T = {
 };
 
 export default function DropDetailScreen() {
+  const { user, isReady } = useAuth();
   const { id: routeId } = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(routeId) ? routeId[0] : routeId;
   const { data: drop, isLoading, isError, error, refetch, isRefetching } = useDrop(id ?? '');
@@ -41,6 +43,8 @@ export default function DropDetailScreen() {
       useNativeDriver: true,
     }).start();
   }, [drop?.id, imageReveal]);
+
+  if (isReady && !user) return <Redirect href="/" />;
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
