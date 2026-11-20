@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   Animated,
@@ -15,6 +16,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useDrop } from '@/hooks/use-drop';
 import { useAuth } from '@/context/auth-context';
+import { api } from '@/lib/api';
+
+type ReservationResponse = {
+  message: string;
+  reservation: { id?: string; drop_id?: string };
+};
 
 const T = {
   bone: '#E9E4D9',
@@ -27,12 +34,48 @@ const T = {
 };
 
 export default function DropDetailScreen() {
-  const { user, isReady } = useAuth();
+  const { user, isReady, signOut } = useAuth();
+  const queryClient = useQueryClient();
   const { id: routeId } = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(routeId) ? routeId[0] : routeId;
   const { data: drop, isLoading, isError, error, refetch, isRefetching } = useDrop(id ?? '');
   const notFound = axios.isAxiosError(error) && error.response?.status === 404;
   const imageReveal = useRef(new Animated.Value(0)).current;
+  const reservationMutation = useMutation<ReservationResponse, unknown, string>({
+    mutationFn: async (dropId) => {
+      const response = await api.post<ReservationResponse>('/reservations/', { dropId });
+      return response.data;
+    },
+    onSuccess: (_response, dropId) => {
+      void queryClient.invalidateQueries({ queryKey: ['drop', dropId] });
+      void queryClient.invalidateQueries({ queryKey: ['drops'] });
+    },
+    onError: (mutationError, dropId) => {
+      if (axios.isAxiosError(mutationError) && [404, 409].includes(mutationError.response?.status ?? 0)) {
+        void queryClient.invalidateQueries({ queryKey: ['drop', dropId] });
+      }
+    },
+  });
+
+  const reservationStatus = axios.isAxiosError(reservationMutation.error)
+    ? reservationMutation.error.response?.status
+    : undefined;
+  const apiErrorMessage = axios.isAxiosError<{ message?: string }>(reservationMutation.error)
+    ? reservationMutation.error.response?.data?.message
+    : undefined;
+  const isAlreadyReserved = reservationStatus === 409 && apiErrorMessage?.toLowerCase().includes('already reserved');
+  const isReservationUnavailable = reservationStatus === 409 && !isAlreadyReserved;
+
+  function reserveDrop() {
+    if (drop && user && drop.available_inventory > 0 && !reservationMutation.isPending) {
+      reservationMutation.mutate(drop.id);
+    }
+  }
+
+  async function handleExpiredSession() {
+    await signOut();
+    router.replace({ pathname: '/auth', params: { mode: 'login' } });
+  }
 
   useEffect(() => {
     if (!drop) return;
@@ -152,27 +195,88 @@ export default function DropDetailScreen() {
               </View>
             </View>
 
-            <Pressable
-              disabled
-              style={({ pressed }) => [
-                s.cta,
-                drop.available_inventory <= 0 && s.ctaClosed,
-                pressed && s.ctaPressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: true }}
-              accessibilityLabel={drop.available_inventory <= 0 ? 'This drop is sold out' : 'Reservation flow is coming soon'}
-            >
-              <Text style={s.ctaText}>
-                {drop.available_inventory <= 0 ? 'RELEASE CLOSED' : 'RESERVE THIS DROP'}
-              </Text>
-              {drop.available_inventory > 0 ? (
-                <Ionicons name="arrow-forward" size={18} color={T.bone} />
-              ) : null}
-            </Pressable>
-            {drop.available_inventory > 0 ? (
-              <Text style={s.ctaNote}>RESERVATIONS OPEN IN THE NEXT UPDATE</Text>
-            ) : null}
+            {reservationMutation.isSuccess ? (
+              <View style={s.successPanel} accessibilityRole="summary" accessibilityLiveRegion="polite">
+                <View style={s.successMark}>
+                  <Ionicons name="checkmark" size={19} color={T.ink} />
+                </View>
+                <View style={s.successCopy}>
+                  <Text style={s.successEyebrow}>RESERVATION / CONFIRMED</Text>
+                  <Text style={s.successTitle}>You’re on the list.</Text>
+                  {reservationMutation.data?.reservation?.id ? (
+                    <Text style={s.reservationId} numberOfLines={1}>
+                      REF / {reservationMutation.data.reservation.id}
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  onPress={() => router.replace('/(tabs)')}
+                  style={({ pressed }) => [s.successAction, pressed && s.pressed]}
+                  accessibilityRole="button"
+                >
+                  <Text style={s.successActionText}>BACK TO DISCOVERY</Text>
+                  <Ionicons name="arrow-forward" size={16} color={T.bone} />
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <Pressable
+                  onPress={reservationStatus === 401 ? handleExpiredSession : reservationStatus === 404 ? () => router.replace('/(tabs)') : reserveDrop}
+                  disabled={drop.available_inventory <= 0 || reservationMutation.isPending || isAlreadyReserved || (isReservationUnavailable && isRefetching)}
+                  style={({ pressed }) => [
+                    s.cta,
+                    (drop.available_inventory <= 0 || isReservationUnavailable || isAlreadyReserved) && s.ctaClosed,
+                    isReservationUnavailable && !isRefetching && s.ctaRetry,
+                    reservationMutation.isPending && s.ctaPending,
+                    pressed && !reservationMutation.isPending && s.ctaPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: drop.available_inventory <= 0 || reservationMutation.isPending || isAlreadyReserved || (isReservationUnavailable && isRefetching), busy: reservationMutation.isPending || (isReservationUnavailable && isRefetching) }}
+                  accessibilityLabel={reservationMutation.isPending ? 'Reserving this drop' : 'Reserve this drop'}
+                >
+                  {reservationMutation.isPending ? <ActivityIndicator color={T.bone} size="small" /> : (
+                    <>
+                      <Text style={s.ctaText}>
+                        {drop.available_inventory <= 0 ? 'RELEASE CLOSED'
+                          : reservationStatus === 401 ? 'SIGN IN AGAIN'
+                          : reservationStatus === 404 ? 'BACK TO DISCOVERY'
+                          : isAlreadyReserved ? 'ALREADY RESERVED'
+                          : isReservationUnavailable && isRefetching ? 'CHECKING AVAILABILITY'
+                          : isReservationUnavailable ? 'TRY AGAIN'
+                          : reservationMutation.isError ? 'TRY AGAIN'
+                          : 'RESERVE THIS DROP'}
+                      </Text>
+                      <Ionicons name="arrow-forward" size={18} color={T.bone} />
+                    </>
+                  )}
+                </Pressable>
+
+                {reservationMutation.isError ? (
+                  <View style={s.reservationNotice} accessibilityLiveRegion="polite">
+                    <Ionicons
+                      name={reservationStatus === 401 ? 'lock-closed-outline' : 'alert-circle-outline'}
+                      size={16}
+                      color={T.clay}
+                    />
+                    <Text style={s.reservationNoticeText}>
+                      {reservationStatus === 401
+                        ? 'Your sign-in expired. Sign in again to reserve this release.'
+                        : reservationStatus === 404
+                          ? 'This drop is no longer available. Return to discovery for current releases.'
+                          : isAlreadyReserved
+                            ? 'Your account already has a reservation for this drop.'
+                            : isReservationUnavailable
+                              ? 'This release just closed. Check the refreshed availability, then try again if units remain.'
+                              : apiErrorMessage ?? 'We couldn’t complete the reservation. Check your connection and try again.'}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {drop.available_inventory > 0 && !reservationMutation.isError ? (
+                  <Text style={s.ctaNote}>ONE RESERVATION PER ACCOUNT</Text>
+                ) : null}
+              </>
+            )}
           </>
         ) : null}
       </ScrollView>
@@ -394,8 +498,20 @@ const s = StyleSheet.create({
   },
   ctaPressed: { backgroundColor: '#303833', transform: [{ scale: 0.99 }] },
   ctaClosed: { backgroundColor: '#A8A397' },
+  ctaRetry: { backgroundColor: T.ink },
+  ctaPending: { backgroundColor: '#303833' },
   ctaText: { color: T.bone, fontSize: 9, fontWeight: '800', letterSpacing: 1.4 },
   ctaNote: { color: T.muted, fontSize: 7, textAlign: 'center', letterSpacing: 1.1, marginTop: 10 },
+  reservationNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, marginTop: 12, borderWidth: 1, borderColor: 'rgba(182,108,75,0.24)', backgroundColor: 'rgba(182,108,75,0.08)' },
+  reservationNoticeText: { flex: 1, color: T.ink, fontSize: 10, lineHeight: 15 },
+  successPanel: { marginTop: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(99,119,77,0.36)', backgroundColor: 'rgba(183,198,154,0.17)' },
+  successMark: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: T.sage },
+  successCopy: { marginTop: 13 },
+  successEyebrow: { color: '#63774D', fontSize: 8, fontWeight: '800', letterSpacing: 1.5 },
+  successTitle: { color: T.ink, fontFamily: 'serif', fontSize: 27, lineHeight: 32, marginTop: 5 },
+  reservationId: { color: T.muted, fontSize: 8, letterSpacing: 0.4, marginTop: 7 },
+  successAction: { minHeight: 48, marginTop: 15, paddingHorizontal: 13, backgroundColor: T.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  successActionText: { color: T.bone, fontSize: 8, fontWeight: '800', letterSpacing: 1 },
   state: { flex: 1, minHeight: 400, justifyContent: 'center', alignItems: 'flex-start', paddingVertical: 42 },
   stateTitle: { color: T.ink, fontFamily: 'serif', fontSize: 28, lineHeight: 34, marginTop: 14 },
   stateText: { color: T.muted, fontSize: 13, lineHeight: 20, marginTop: 9, maxWidth: 300 },
