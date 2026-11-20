@@ -1,8 +1,7 @@
 
-import { DarkTheme, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import AppTabs from '@/components/app-tabs';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,7 +17,10 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={DarkTheme}>
         <StatusBar style="light" backgroundColor="#101914" />
-        <AppTabs />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="drop/[id]" options={{ animation: 'slide_from_right' }} />
+        </Stack>
       </ThemeProvider>
     </QueryClientProvider>
   );

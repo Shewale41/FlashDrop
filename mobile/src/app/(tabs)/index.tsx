@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Link } from 'expo-router';
 import { COLORS as C } from '@/constants/flashdrop';
 import { useDrops } from '@/hooks/use-drops';
 
@@ -104,42 +105,41 @@ export default function HomeScreen() {
           const soldOut = drop.available_inventory <= 0;
 
           return (
-            <View key={drop.id} style={s.drop}>
-              <View style={s.dropTop}>
-                <Text style={s.dropIndex}>
-                  DROP / {String(index + 1).padStart(2, '0')}
-                </Text>
-                <View style={[s.status, soldOut && s.soldOut]}>
-                  <View style={[s.statusDot, soldOut && s.soldOutDot]} />
-                  <Text style={s.statusText}>
-                    {soldOut ? 'SOLD OUT' : 'AVAILABLE'}
+            <Link
+              key={drop.id}
+              href={{ pathname: '/drop/[id]', params: { id: drop.id } }}
+              asChild
+            >
+              <Pressable
+                style={s.drop}
+                accessibilityRole="button"
+                accessibilityLabel={`View ${drop.name}, ${soldOut ? 'sold out' : `${drop.available_inventory} available`}`}
+              >
+                <View style={s.dropTop}>
+                  <Text style={s.dropIndex}>
+                    DROP / {String(index + 1).padStart(2, '0')}
                   </Text>
+                  <View style={[s.status, soldOut && s.soldOut]}>
+                    <View style={[s.statusDot, soldOut && s.soldOutDot]} />
+                    <Text style={s.statusText}>
+                      {soldOut ? 'SOLD OUT' : 'AVAILABLE'}
+                    </Text>
+                  </View>
                 </View>
-              </View>
 
-              <Text style={s.dropName}>{drop.name}</Text>
+                <Text style={s.dropName}>{drop.name}</Text>
 
-              <View style={s.dropBottom}>
-                <View>
-                  <Text style={s.label}>REMAINING INVENTORY</Text>
-                  <Text style={s.inventory}>
-                    {drop.available_inventory.toLocaleString('en-IN')}
-                  </Text>
+                <View style={s.dropBottom}>
+                  <View>
+                    <Text style={s.label}>REMAINING INVENTORY</Text>
+                    <Text style={s.inventory}>
+                      {drop.available_inventory.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <Text style={s.dropId}>{drop.id}</Text>
                 </View>
-                <Text style={s.dropId}>{drop.id}</Text>
-              </View>
-
-              <View style={s.inventoryTrack}>
-                <View
-                  style={[
-                    s.inventoryFill,
-                    {
-                      width: soldOut ? '0%' : '100%',
-                    },
-                  ]}
-                />
-              </View>
-            </View>
+              </Pressable>
+            </Link>
           );
         })}
 
@@ -225,10 +225,6 @@ const s = StyleSheet.create({
   label: { color: C.muted, fontSize: 8, letterSpacing: 1.2 },
   inventory: { color: C.accent, fontSize: 23, fontWeight: '600', marginTop: 5 },
   dropId: { color: C.muted, fontSize: 9 },
-  inventoryTrack: {
-    height: 2, backgroundColor: C.line, marginTop: 17, overflow: 'hidden',
-  },
-  inventoryFill: { height: 2, backgroundColor: C.accent },
   footer: {
     paddingTop: 35, flexDirection: 'row',
     justifyContent: 'space-between', alignItems: 'center',

@@ -329,3 +329,17 @@ With PgBouncer:
 32. cold and warm request 
  - Cold start = infrastructure needs to become available. server chalu karne wala request / first request - slow beacuse neend se uthata hai
  - Warm request = infrastructure and connection are already available. chalu server hone pe fastest request / second request - fast becz server ab uth chuka hai
+
+33. adb reverse (we already know this) 
+  - adb reverse tcp:<DEVICE_PORT> tcp:<HOST_PORT>
+    Part	Meaning	In FlashDrop
+    First tcp:3000	Port on Android emulator	3000
+    Second tcp:3000	Port on your Windows computer	3000
+  - used to forward the request on a device port to host port okay 
+  - Remember this
+  adb reverse tcp:DEVICE_PORT tcp:COMPUTER_PORT
+  - reverse = device → computer.
+  - First port = Android side.
+  - Second port = computer side.  
+
+  
