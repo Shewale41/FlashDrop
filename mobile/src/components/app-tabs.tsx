@@ -33,7 +33,7 @@ export default function AppTabs() {
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? 'compass' : 'compass-outline'}
-              color={color}
+              color={color as string}
               size={size}
             />
           ),
@@ -47,7 +47,21 @@ export default function AppTabs() {
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? 'grid' : 'grid-outline'}
-              color={color}
+              color={color as string}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="reservations"
+        options={{
+          title: 'Reservations',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'ticket' : 'ticket-outline'}
+              color={color as string}
               size={size}
             />
           ),

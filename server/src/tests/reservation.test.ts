@@ -83,6 +83,12 @@ describe("Reservations API", () => {
     expect(response.status).toBe(401);
   });
 
+  it("rejects reservation history without authentication", async () => {
+    const response = await request(app).get("/reservations/mine");
+
+    expect(response.status).toBe(401);
+  });
+
   it("rejects a request without a drop ID", async () => {
     const response = await request(app)
       .post("/reservations")
@@ -110,6 +116,22 @@ describe("Reservations API", () => {
     );
 
     expect(result.rows[0].available_inventory).toBe(4);
+  });
+
+  it("returns this user's confirmed reservations with drop details", async () => {
+    const response = await request(app)
+      .get("/reservations/mine")
+      .set("Authorization", authHeader);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        drop_id: successDropId,
+        drop_name: "Reservation Success Test",
+        status: "confirmed",
+      }),
+    ]));
+    expect(response.body.data.every((reservation: { id: string }) => Boolean(reservation.id))).toBe(true);
   });
 
   it("returns 404 when the drop does not exist", async () => {

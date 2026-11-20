@@ -7,6 +7,38 @@ import redisClient from "../db/redis.ts";
 
 const router = Router();
 
+router.get("/mine", authenticate, async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({
+      message: "Not authenticated",
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT reservations.id,
+              reservations.drop_id,
+              drops.name AS drop_name
+       FROM reservations
+       LEFT JOIN drops ON drops.id = reservations.drop_id
+       WHERE reservations.user_id = $1`,
+      [req.user.userId]
+    );
+
+    return res.status(200).json({
+      data: result.rows.map((reservation) => ({
+        ...reservation,
+        status: "confirmed",
+      })),
+    });
+  } catch (error) {
+    console.error("Failed to load reservation history:", error);
+    return res.status(500).json({
+      message: "Failed to load reservations",
+    });
+  }
+});
+
 router.post("/", authenticate, async (req, res) => {
   const { dropId } = req.body;
 
