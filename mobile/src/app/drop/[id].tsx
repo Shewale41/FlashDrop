@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
@@ -41,6 +41,9 @@ export default function DropDetailScreen() {
   const { data: drop, isLoading, isError, error, refetch, isRefetching } = useDrop(id ?? '');
   const notFound = axios.isAxiosError(error) && error.response?.status === 404;
   const imageReveal = useRef(new Animated.Value(0)).current;
+  const [now, setNow] = useState(Date.now());
+  const releaseTimestamp = drop?.release_at ? Date.parse(drop.release_at) : Number.NaN;
+  const isScheduled = Number.isFinite(releaseTimestamp) && releaseTimestamp > now;
   const reservationMutation = useMutation<ReservationResponse, unknown, string>({
     mutationFn: async (dropId) => {
       const response = await api.post<ReservationResponse>('/reservations/', { dropId });
@@ -64,10 +67,12 @@ export default function DropDetailScreen() {
     ? reservationMutation.error.response?.data?.message
     : undefined;
   const isAlreadyReserved = reservationStatus === 409 && apiErrorMessage?.toLowerCase().includes('already reserved');
-  const isReservationUnavailable = reservationStatus === 409 && !isAlreadyReserved;
+  const isNotOpenYet = reservationStatus === 409 && apiErrorMessage?.toLowerCase().includes('not open yet');
+  const isReservationUnavailable = reservationStatus === 409 && !isAlreadyReserved && !isNotOpenYet;
+  const showSchedule = isScheduled || isNotOpenYet;
 
   function reserveDrop() {
-    if (drop && user && drop.available_inventory > 0 && !reservationMutation.isPending) {
+    if (drop && user && !isScheduled && drop.available_inventory > 0 && !reservationMutation.isPending) {
       reservationMutation.mutate(drop.id);
     }
   }
@@ -87,6 +92,12 @@ export default function DropDetailScreen() {
     }).start();
   }, [drop?.id, imageReveal]);
 
+  useEffect(() => {
+    if (!Number.isFinite(releaseTimestamp) || releaseTimestamp <= now) return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(releaseTimestamp - now, 30_000));
+    return () => clearTimeout(timer);
+  }, [releaseTimestamp, now]);
+
   if (isReady && !user) return <Redirect href="/" />;
 
   return (
@@ -95,7 +106,7 @@ export default function DropDetailScreen() {
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={s.header}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
             style={({ pressed }) => [s.backButton, pressed && s.pressed]}
             accessibilityRole="button"
             accessibilityLabel="Back to discovery"
@@ -175,25 +186,44 @@ export default function DropDetailScreen() {
               <Text style={s.eventLine}>A release is a moment.</Text>
             </View>
 
-            <View style={s.availability}>
-              <View style={s.availabilityTop}>
-                <View style={s.availabilityLabelRow}>
-                  <View style={[s.availabilityDot, drop.available_inventory <= 0 && s.closedDot]} />
-                  <Text style={s.label}>
-                    {drop.available_inventory <= 0 ? 'RELEASE CLOSED' : 'LIVE AVAILABILITY'}
+            {showSchedule ? (
+              <View style={s.schedulePanel} accessibilityLiveRegion="polite">
+                <View style={s.scheduleTop}>
+                  <View style={s.availabilityLabelRow}>
+                    <View style={s.scheduleDot} />
+                    <Text style={s.label}>RELEASE SCHEDULED</Text>
+                  </View>
+                  <Ionicons name="time-outline" size={16} color={T.muted} />
+                </View>
+                <Text style={s.scheduleDate}>
+                  {new Intl.DateTimeFormat(undefined, {
+                    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+                    hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+                  }).format(new Date(releaseTimestamp))}
+                </Text>
+                <Text style={s.scheduleNote}>RESERVATIONS OPEN AT THIS TIME / LOCAL TIME</Text>
+              </View>
+            ) : (
+              <View style={s.availability}>
+                <View style={s.availabilityTop}>
+                  <View style={s.availabilityLabelRow}>
+                    <View style={[s.availabilityDot, drop.available_inventory <= 0 && s.closedDot]} />
+                    <Text style={s.label}>
+                      {drop.available_inventory <= 0 ? 'RELEASE CLOSED' : 'LIVE AVAILABILITY'}
+                    </Text>
+                  </View>
+                  <Text style={s.unitsLabel}>UNITS</Text>
+                </View>
+                <View style={s.inventoryRow}>
+                  <Text style={[s.inventory, drop.available_inventory <= 0 && s.inventoryClosed]}>
+                    {drop.available_inventory.toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={s.inventoryAside}>
+                    {drop.available_inventory <= 0 ? 'SOLD\nOUT' : 'REMAINING\nIN THIS DROP'}
                   </Text>
                 </View>
-                <Text style={s.unitsLabel}>UNITS</Text>
               </View>
-              <View style={s.inventoryRow}>
-                <Text style={[s.inventory, drop.available_inventory <= 0 && s.inventoryClosed]}>
-                  {drop.available_inventory.toLocaleString('en-IN')}
-                </Text>
-                <Text style={s.inventoryAside}>
-                  {drop.available_inventory <= 0 ? 'SOLD\nOUT' : 'REMAINING\nIN THIS DROP'}
-                </Text>
-              </View>
-            </View>
+            )}
 
             {reservationMutation.isSuccess ? (
               <View style={s.successPanel} accessibilityRole="summary" accessibilityLiveRegion="polite">
@@ -218,6 +248,29 @@ export default function DropDetailScreen() {
                   <Ionicons name="arrow-forward" size={16} color={T.bone} />
                 </Pressable>
               </View>
+            ) : showSchedule ? (
+              isNotOpenYet && !isScheduled ? (
+                <Pressable
+                  onPress={reserveDrop}
+                  disabled={reservationMutation.isPending}
+                  style={({ pressed }) => [s.scheduledCta, pressed && !reservationMutation.isPending && s.ctaPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Check whether reservations have opened"
+                  accessibilityState={{ disabled: reservationMutation.isPending, busy: reservationMutation.isPending }}
+                >
+                  {reservationMutation.isPending ? <ActivityIndicator color={T.bone} size="small" /> : (
+                    <>
+                      <Text style={s.ctaText}>CHECK AGAIN</Text>
+                      <Ionicons name="refresh" size={17} color={T.bone} />
+                    </>
+                  )}
+                </Pressable>
+              ) : (
+                <View style={s.scheduledCta} accessible accessibilityLabel="Reservations open at the scheduled release time">
+                  <Text style={s.ctaText}>RESERVATIONS NOT OPEN</Text>
+                  <Ionicons name="time-outline" size={18} color={T.bone} />
+                </View>
+              )
             ) : (
               <>
                 <Pressable
@@ -240,6 +293,7 @@ export default function DropDetailScreen() {
                         {drop.available_inventory <= 0 ? 'RELEASE CLOSED'
                           : reservationStatus === 401 ? 'SIGN IN AGAIN'
                           : reservationStatus === 404 ? 'BACK TO DISCOVERY'
+                          : isNotOpenYet ? 'CHECK RELEASE TIME'
                           : isAlreadyReserved ? 'ALREADY RESERVED'
                           : isReservationUnavailable && isRefetching ? 'CHECKING AVAILABILITY'
                           : isReservationUnavailable ? 'TRY AGAIN'
@@ -263,6 +317,8 @@ export default function DropDetailScreen() {
                         ? 'Your sign-in expired. Sign in again to reserve this release.'
                         : reservationStatus === 404
                           ? 'This drop is no longer available. Return to discovery for current releases.'
+                          : isNotOpenYet
+                            ? 'Reservations have not opened yet. Check the scheduled local release time above.'
                           : isAlreadyReserved
                             ? 'Your account already has a reservation for this drop.'
                             : isReservationUnavailable
@@ -463,6 +519,11 @@ const s = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 13,
   },
+  schedulePanel: { marginTop: 2, paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: T.line },
+  scheduleTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  scheduleDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#63774D' },
+  scheduleDate: { color: T.ink, fontFamily: 'serif', fontSize: 23, lineHeight: 29, marginTop: 13 },
+  scheduleNote: { color: T.muted, fontSize: 7, letterSpacing: 1.2, marginTop: 8 },
   availabilityTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   availabilityLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   availabilityDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#63774D' },
@@ -500,6 +561,7 @@ const s = StyleSheet.create({
   ctaClosed: { backgroundColor: '#A8A397' },
   ctaRetry: { backgroundColor: T.ink },
   ctaPending: { backgroundColor: '#303833' },
+  scheduledCta: { minHeight: 56, marginTop: 20, paddingHorizontal: 18, backgroundColor: '#77786E', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   ctaText: { color: T.bone, fontSize: 9, fontWeight: '800', letterSpacing: 1.4 },
   ctaNote: { color: T.muted, fontSize: 7, textAlign: 'center', letterSpacing: 1.1, marginTop: 10 },
   reservationNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, marginTop: 12, borderWidth: 1, borderColor: 'rgba(182,108,75,0.24)', backgroundColor: 'rgba(182,108,75,0.08)' },

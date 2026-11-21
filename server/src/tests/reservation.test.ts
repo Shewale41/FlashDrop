@@ -22,11 +22,13 @@ const email = `reservation-test-${randomUUID()}@example.com`;
 const successDropId = `test-res-${randomUUID()}`;
 const duplicateDropId = `test-res-${randomUUID()}`;
 const soldOutDropId = `test-res-${randomUUID()}`;
+const upcomingDropId = `test-res-${randomUUID()}`;
 
 const dropIds = [
   successDropId,
   duplicateDropId,
   soldOutDropId,
+  upcomingDropId,
 ];
 
 const token = jwt.sign(
@@ -48,11 +50,12 @@ describe("Reservations API", () => {
 
     // Prepare independent drops for our tests.
     await pool.query(
-      `INSERT INTO drops (id, name, available_inventory)
+      `INSERT INTO drops (id, name, available_inventory, release_at)
        VALUES
-         ($1, 'Reservation Success Test', 5),
-         ($2, 'Duplicate Reservation Test', 5),
-         ($3, 'Sold Out Reservation Test', 0)`,
+         ($1, 'Reservation Success Test', 5, NULL),
+         ($2, 'Duplicate Reservation Test', 5, NULL),
+         ($3, 'Sold Out Reservation Test', 0, NULL),
+         ($4, 'Upcoming Reservation Test', 5, NOW() + INTERVAL '1 day')`,
       dropIds
     );
   }, 30000);
@@ -159,6 +162,22 @@ describe("Reservations API", () => {
     );
 
     expect(result.rows[0].available_inventory).toBe(0);
+  });
+
+  it("does not allow reservations before a scheduled release", async () => {
+    const response = await request(app)
+      .post("/reservations")
+      .set("Authorization", authHeader)
+      .send({ dropId: upcomingDropId });
+
+    expect(response.status).toBe(409);
+    expect(response.body.message).toBe("Drop is not open yet");
+
+    const result = await pool.query(
+      "SELECT available_inventory FROM drops WHERE id = $1",
+      [upcomingDropId]
+    );
+    expect(result.rows[0].available_inventory).toBe(5);
   });
 
   it("rejects a duplicate reservation without decrementing inventory again", async () => {

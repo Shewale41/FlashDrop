@@ -3,6 +3,7 @@ export interface Drop {
   id: string;
   name: string;
   available_inventory: number;
+  release_at?: string | null;
 }
 
 export interface DropsResponse {

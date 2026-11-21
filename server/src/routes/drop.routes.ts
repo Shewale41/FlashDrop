@@ -5,6 +5,10 @@ import redisClient from "../db/redis.ts";
 
 const router = Router();
 
+function isValidReleaseAt(value: unknown): value is string | null {
+  return value === null || (typeof value === "string" && Number.isFinite(Date.parse(value)));
+}
+
 // const drops: Drop[] = [
 //   {
 //     id: "drop_1",
@@ -68,6 +72,8 @@ try {
 
   result = await client.query(
     `SELECT * FROM drops
+     WHERE (to_jsonb(drops)->>'release_at') IS NULL
+        OR (to_jsonb(drops)->>'release_at')::timestamptz <= NOW()
      ORDER BY id
      LIMIT $1 OFFSET $2`,
     [limit + 1, offset]
@@ -114,6 +120,24 @@ try {
 
 
 
+
+router.get("/upcoming", async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT drops.*
+       FROM drops
+       WHERE (to_jsonb(drops)->>'release_at') IS NOT NULL
+         AND (to_jsonb(drops)->>'release_at')::timestamptz > NOW()
+       ORDER BY (to_jsonb(drops)->>'release_at')::timestamptz ASC
+       LIMIT 20`
+    );
+
+    return res.status(200).json({ data: result.rows });
+  } catch (error) {
+    console.error("Failed to fetch upcoming drops:", error);
+    return res.status(500).json({ message: "Failed to fetch upcoming drops" });
+  }
+});
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
@@ -173,7 +197,7 @@ router.get("/:id", async (req, res) => {
 
 
 router.post("/", async (req, res) => {
-  const { id, name, availableInventory } = req.body ?? {};
+  const { id, name, availableInventory, releaseAt } = req.body ?? {};
 
   // Validate the ID.
   if (
@@ -207,13 +231,26 @@ router.post("/", async (req, res) => {
     });
   }
 
+  if (releaseAt !== undefined && releaseAt !== null && !isValidReleaseAt(releaseAt)) {
+    return res.status(400).json({
+      message: "releaseAt must be a valid date-time or null",
+    });
+  }
+
   try {
-    const addedRow = await pool.query(
-      `INSERT INTO drops (id, name, available_inventory)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [id.trim(), name.trim(), availableInventory]
-    );
+    const addedRow = releaseAt == null
+      ? await pool.query(
+          `INSERT INTO drops (id, name, available_inventory)
+           VALUES ($1, $2, $3)
+           RETURNING *`,
+          [id.trim(), name.trim(), availableInventory]
+        )
+      : await pool.query(
+          `INSERT INTO drops (id, name, available_inventory, release_at)
+           VALUES ($1, $2, $3, $4)
+           RETURNING *`,
+          [id.trim(), name.trim(), availableInventory, new Date(releaseAt).toISOString()]
+        );
 
     return res.status(201).json(addedRow.rows[0]);
   } catch (error) {
@@ -240,7 +277,7 @@ router.post("/", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, availableInventory } = req.body ?? {};
+  const { name, availableInventory, releaseAt } = req.body ?? {};
 
   if (typeof id !== "string" || id.trim().length === 0) {
     return res.status(400).json({ message: "A valid drop ID is required" });
@@ -263,15 +300,31 @@ router.put("/:id", async (req, res) => {
     });
   }
 
+  if (releaseAt !== undefined && releaseAt !== null && !isValidReleaseAt(releaseAt)) {
+    return res.status(400).json({
+      message: "releaseAt must be a valid date-time or null",
+    });
+  }
+
   try {
-    const updatedRow = await pool.query(
-      `UPDATE drops
-       SET name = $1,
-           available_inventory = $2
-       WHERE id = $3
-       RETURNING *`,
-      [name.trim(), availableInventory, id]
-    );
+    const updatedRow = releaseAt === undefined
+      ? await pool.query(
+          `UPDATE drops
+           SET name = $1,
+               available_inventory = $2
+           WHERE id = $3
+           RETURNING *`,
+          [name.trim(), availableInventory, id]
+        )
+      : await pool.query(
+          `UPDATE drops
+           SET name = $1,
+               available_inventory = $2,
+               release_at = $3
+           WHERE id = $4
+           RETURNING *`,
+          [name.trim(), availableInventory, releaseAt === null ? null : new Date(releaseAt).toISOString(), id]
+        );
 
     if (updatedRow.rows.length === 0) {
       return res.status(404).json({ message: "Drop not found" });

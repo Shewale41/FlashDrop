@@ -64,7 +64,8 @@ router.post("/", authenticate, async (req, res) => {
 
       // Lock the drop row
       const dropData = await client.query(
-        `SELECT *
+        `SELECT *,
+                COALESCE((to_jsonb(drops)->>'release_at')::timestamptz > NOW(), false) AS is_scheduled
          FROM drops
          WHERE id = $1
          FOR UPDATE`,
@@ -80,6 +81,13 @@ router.post("/", authenticate, async (req, res) => {
       }
 
       const drop = dropData.rows[0];
+
+      if (drop.is_scheduled) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message: "Drop is not open yet",
+        });
+      }
 
       if (drop.available_inventory <= 0) {
         await client.query("ROLLBACK");

@@ -21,7 +21,6 @@ const T = {
   clay: '#B66C4B',
   muted: '#77786E',
   line: '#C9C3B7',
-  paper: '#F0ECE4',
 };
 
 export default function HomeScreen() {
@@ -56,20 +55,6 @@ export default function HomeScreen() {
             <Text style={s.tagline}>THE ART OF THE DROP</Text>
           </View>
           <View style={s.actions}>
-            <Pressable
-              style={s.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Search drops"
-            >
-              <Ionicons name="search-outline" size={19} color={T.ink} />
-            </Pressable>
-            <Pressable
-              style={s.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Notifications"
-            >
-              <Ionicons name="notifications-outline" size={19} color={T.ink} />
-            </Pressable>
             <Link href="/account" asChild>
               <Pressable
                 style={s.iconButton}
@@ -122,18 +107,23 @@ export default function HomeScreen() {
         ) : null}
 
         {isError ? (
-          <View style={s.state}>
+          <View style={s.state} accessibilityLiveRegion="polite">
             <View style={s.stateCopy}>
               <Text style={s.stateTitle}>The releases didn’t come through.</Text>
               <Text style={s.stateText}>Check your connection, then try again.</Text>
             </View>
             <Pressable
               onPress={() => refetch()}
-              style={({ pressed }) => [s.retry, pressed && s.pressed]}
+              disabled={isRefetching}
+              style={({ pressed }) => [s.retry, pressed && !isRefetching && s.pressed]}
               accessibilityRole="button"
+              accessibilityLabel="Retry loading drops"
+              accessibilityState={{ busy: isRefetching, disabled: isRefetching }}
             >
-              <Text style={s.retryText}>TRY AGAIN</Text>
-              <Ionicons name="arrow-forward" size={16} color={T.bone} />
+              <Text style={s.retryText}>{isRefetching ? 'CHECKING…' : 'TRY AGAIN'}</Text>
+              {isRefetching
+                ? <ActivityIndicator size="small" color={T.bone} />
+                : <Ionicons name="arrow-forward" size={16} color={T.bone} />}
             </Pressable>
           </View>
         ) : null}

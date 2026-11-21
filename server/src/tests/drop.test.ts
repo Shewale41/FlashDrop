@@ -13,6 +13,7 @@ import app from "../app.ts";
 import pool from "../db/index.ts";
 import redisClient, { connectRedis } from "../db/redis.ts";
 const dropId = `test-drop-${randomUUID()}`;
+const scheduledDropId = `test-upcoming-${randomUUID()}`;
 const cacheKey = `flashdrop:drop:${dropId}`;
 
 describe("Drops API", () => {
@@ -58,6 +59,31 @@ it("lists drops", async () => {
       name: "Test Drop",
       available_inventory: 10,
     });
+  });
+
+  it("creates a scheduled drop and returns it from the upcoming endpoint", async () => {
+    const releaseAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const created = await request(app)
+      .post("/drops")
+      .send({
+        id: scheduledDropId,
+        name: "Scheduled Test Drop",
+        availableInventory: 12,
+        releaseAt,
+      });
+
+    expect(created.status).toBe(201);
+    expect(new Date(created.body.release_at).toISOString()).toBe(releaseAt);
+
+    const upcoming = await request(app).get("/drops/upcoming");
+    expect(upcoming.status).toBe(200);
+    expect(upcoming.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: scheduledDropId,
+        name: "Scheduled Test Drop",
+        release_at: created.body.release_at,
+      }),
+    ]));
   });
 
   it("returns 404 for a nonexistent drop", async () => {
@@ -252,7 +278,7 @@ it("returns 400 when updating with invalid inventory", async () => {
   
 afterAll(async () => {
   await redisClient.del(cacheKey);
-  await pool.query("DELETE FROM drops WHERE id = $1", [dropId]);
+  await pool.query("DELETE FROM drops WHERE id = ANY($1::text[])", [[dropId, scheduledDropId]]);
 });
 
 });

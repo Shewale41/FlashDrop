@@ -32,7 +32,12 @@ export default function AccountScreen() {
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
       <View style={s.header}>
-        <Pressable onPress={() => router.back()} style={s.back} accessibilityRole="button" accessibilityLabel="Back to discovery">
+        <Pressable
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
+          style={s.back}
+          accessibilityRole="button"
+          accessibilityLabel="Back to discovery"
+        >
           <Ionicons name="arrow-back" size={19} color={T.ink} />
         </Pressable>
         <Text style={s.logo}>flashdrop<Text style={s.dot}>.</Text></Text>
@@ -41,7 +46,12 @@ export default function AccountScreen() {
 
       <View style={s.body}>
         <Text style={s.eyebrow}>MEMBER / ACCOUNT DETAILS</Text>
-        <View style={s.portrait} accessibilityLabel={`Account initials ${initials || 'FD'}`}>
+        <View
+          style={s.portrait}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={`Account initials ${initials || 'FD'}`}
+        >
           <Text style={s.initials}>{initials || 'FD'}</Text>
           <View style={s.portraitAccent} />
         </View>
