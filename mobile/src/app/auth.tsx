@@ -27,7 +27,7 @@ const T = {
 };
 
 type AuthMode = 'login' | 'register';
-type LoginResponse = { user: { id: string; name: string; email: string; token: string } };
+type LoginResponse = { user: { id: string; name: string; email: string; role: 'member' | 'admin'; token: string } };
 type ApiError = { message?: string };
 
 export default function AuthScreen() {
@@ -74,7 +74,7 @@ export default function AuthScreen() {
 
       if (!token) throw new Error('The server did not return a sign-in token.');
 
-      await signIn({ id: account.id, name: account.name, email: account.email }, token);
+      await signIn({ id: account.id, name: account.name, email: account.email, role: account.role }, token);
       router.replace('/(tabs)');
     } catch (error) {
       const serverMessage = axios.isAxiosError<ApiError>(error)

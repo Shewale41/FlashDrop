@@ -32,7 +32,8 @@ export const authenticate = (
     if (
       typeof decoded === "string" ||
       typeof decoded.userId !== "string" ||
-      typeof decoded.email !== "string"
+      typeof decoded.email !== "string" ||
+      (decoded.role !== "member" && decoded.role !== "admin")
     ) {
       return res.status(401).json({
         message: "Invalid token payload",
@@ -42,6 +43,7 @@ export const authenticate = (
     req.user = {
       userId: decoded.userId,
       email: decoded.email,
+      role: decoded.role,
     };
 
     return next();
@@ -50,4 +52,20 @@ export const authenticate = (
       message: "Invalid or expired token",
     });
   }
+};
+
+export const requireAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+
+  return next();
 };

@@ -12,6 +12,7 @@ export type AuthUser = {
   id: string;
   name: string;
   email: string;
+  role: 'member' | 'admin';
 };
 
 type AuthContextValue = {
@@ -42,10 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (active) setUser(storedUser);
 
         try {
-          const response = await api.get<{ user?: { userId?: string; email?: string } }>('/auth/me');
+          const response = await api.get<{ user?: { userId?: string; email?: string; role?: 'member' | 'admin' } }>('/auth/me');
           const serverUser = response.data.user;
-          if (serverUser?.userId && serverUser.email && active) {
-            setUser({ ...storedUser, id: serverUser.userId, email: serverUser.email });
+          if (serverUser?.userId && serverUser.email && serverUser.role && active) {
+            const restoredUser = { ...storedUser, id: serverUser.userId, email: serverUser.email, role: serverUser.role };
+            setUser(restoredUser);
+            await saveAuthSession(restoredUser, token);
           }
         } catch (error) {
           if (axios.isAxiosError(error) && error.response?.status === 401) {

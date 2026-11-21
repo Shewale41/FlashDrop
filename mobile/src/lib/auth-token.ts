@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 const TOKEN_KEY = 'flashdrop.auth-token';
 const USER_KEY = 'flashdrop.auth-user';
 
-export type StoredUser = { id: string; name: string; email: string };
+export type StoredUser = { id: string; name: string; email: string; role: 'member' | 'admin' };
 
 export async function getAuthToken() {
   try {
@@ -25,7 +25,7 @@ export async function getStoredUser(): Promise<StoredUser | null> {
     if (!value) return null;
     const parsed = JSON.parse(value) as Partial<StoredUser>;
     return typeof parsed.id === 'string' && typeof parsed.name === 'string' && typeof parsed.email === 'string'
-      ? { id: parsed.id, name: parsed.name, email: parsed.email }
+      ? { id: parsed.id, name: parsed.name, email: parsed.email, role: parsed.role === 'admin' ? 'admin' : 'member' }
       : null;
   } catch {
     return null;

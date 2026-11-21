@@ -24,6 +24,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="auth" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="account" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="admin" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="drop/[id]" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </ThemeProvider>

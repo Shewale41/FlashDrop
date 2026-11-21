@@ -24,7 +24,7 @@ router.post("/register", async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (id, name, email, password_hash)
        VALUES ($1, $2, $3, $4)
-       RETURNING *`,
+       RETURNING id, name, email, role`,
       [id, name, email, hashPassword]
     );
 
@@ -32,6 +32,7 @@ router.post("/register", async (req, res) => {
       id: result.rows[0].id,
       name: result.rows[0].name,
       email: result.rows[0].email,
+      role: result.rows[0].role,
     });
   } catch (error) {
     console.error(error);
@@ -53,7 +54,7 @@ router.post("/login", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT *
+      `SELECT id, name, email, password_hash, role
        FROM users
        WHERE email = $1`,
       [email]
@@ -82,6 +83,7 @@ router.post("/login", async (req, res) => {
           {
               userId: user.id,
               email: user.email,
+              role: user.role,
           },
           process.env.JWT_SECRET!,
           {
@@ -95,6 +97,7 @@ router.post("/login", async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
         token: token
       },
     });

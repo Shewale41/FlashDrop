@@ -68,6 +68,20 @@ export default function AccountScreen() {
           <Text style={s.id} numberOfLines={1}>{user.id}</Text>
         </View>
 
+        {user.role === 'admin' ? (
+          <Pressable
+            onPress={() => router.push('/admin')}
+            style={({ pressed }) => [s.adminLink, pressed && s.pressed]}
+            accessibilityRole="button"
+          >
+            <View>
+              <Text style={s.adminLinkTitle}>DROP MANAGEMENT</Text>
+              <Text style={s.adminLinkCopy}>Create a live or scheduled release</Text>
+            </View>
+            <Ionicons name="arrow-forward" size={17} color={T.ink} />
+          </Pressable>
+        ) : null}
+
         <Pressable
           onPress={handleSignOut}
           disabled={isSigningOut}
@@ -106,6 +120,9 @@ const s = StyleSheet.create({
   id: { color: T.muted, fontSize: 10, marginTop: 6, marginBottom: 14 },
   rule: { height: 1, backgroundColor: T.line, marginBottom: 13 },
   signOut: { minHeight: 54, marginTop: 24, paddingHorizontal: 16, backgroundColor: T.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  adminLink: { minHeight: 62, marginTop: 15, paddingHorizontal: 13, borderWidth: 1, borderColor: T.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  adminLinkTitle: { color: T.ink, fontSize: 8, fontWeight: '800', letterSpacing: 1.1 },
+  adminLinkCopy: { color: T.muted, fontSize: 10, marginTop: 5 },
   signOutText: { color: T.bone, fontSize: 9, fontWeight: '800', letterSpacing: 1.25 },
   pressed: { opacity: 0.68 },
 });

@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Drop } from "../types/drop.ts";
 import pool from "../db/index.ts";
 import redisClient from "../db/redis.ts";
+import { authenticate, requireAdmin } from "../middleware/auth.middleware.ts";
 
 const router = Router();
 
@@ -196,7 +197,7 @@ router.get("/:id", async (req, res) => {
 
 
 
-router.post("/", async (req, res) => {
+router.post("/", authenticate, requireAdmin, async (req, res) => {
   const { id, name, availableInventory, releaseAt } = req.body ?? {};
 
   // Validate the ID.
@@ -275,7 +276,7 @@ router.post("/", async (req, res) => {
 
 
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { name, availableInventory, releaseAt } = req.body ?? {};
 
@@ -348,7 +349,7 @@ router.put("/:id", async (req, res) => {
 
 
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   if (typeof id !== "string" || id.trim().length === 0) {
