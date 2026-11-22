@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import axios from 'axios';
 import { Link, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';

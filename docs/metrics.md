@@ -375,3 +375,6 @@ by further measurements.
 - No claim of consistent warm-request latency is made.
 
 **Decision:** Retain Neon Free and its existing pooled connection configuration. Accept occasional cold starts during development. Do not send artificial keep-alive requests to avoid suspension.
+
+### fe bundle size metrics 
+“Reduced the Android JavaScript bundle by 16.7% raw and 19.6% gzip by replacing barrel icon imports with direct Ionicons imports.”

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import axios from 'axios';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';

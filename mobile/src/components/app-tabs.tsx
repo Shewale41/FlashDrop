@@ -1,6 +1,6 @@
 
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '@/constants/flashdrop';
 
 export default function AppTabs() {
