@@ -289,3 +289,74 @@ Reservation requests competing for the same inventory are handled in a controlle
 
 ---
 
+## Decision 6 — Redis for Caching
+
+### Context
+
+Repeated requests for frequently accessed drop data can generate unnecessary database queries.
+
+The database should remain responsible for authoritative reservation and inventory state, while cacheable read data can be served more efficiently.
+
+### Decision
+
+Use Redis as a caching layer.
+
+### Cache strategy
+
+Cache-aside:
+
+1. API receives a request.
+2. API checks Redis for the requested data.
+3. If a cache hit occurs, return cached data.
+4. If a cache miss occurs, query PostgreSQL.
+5. Store the retrieved data in Redis.
+6. Return the response.
+
+### Benefits
+
+- Reduces repeated database reads
+- Can reduce database load
+- Improves response latency for cache hits
+- Allows frequently accessed data to be served without repeated SQL queries
+
+### Trade-offs
+
+- Cached data may become stale.
+- Cache invalidation introduces complexity.
+- Redis is an additional dependency.
+- Cache misses still require database access.
+- Cache behavior must be monitored and tested.
+
+---
+
+## Decision 7 — Cache Invalidation After Reservation Mutations
+
+### Context
+
+Reservation operations change inventory. If previously cached drop information is not updated or invalidated, clients may receive outdated inventory information.
+
+### Decision
+
+Invalidate or update the affected cache entries after successful inventory-changing operations.
+
+### Flow
+
+1. Reservation transaction executes.
+2. Database inventory is updated.
+3. Transaction commits successfully.
+4. Related cache entries are invalidated.
+5. Subsequent reads retrieve updated information from the database and repopulate the cache.
+
+### Why invalidate after commit?
+
+The cache should not reflect a reservation that ultimately failed or rolled back.
+
+Invalidating after a successful commit avoids treating an unsuccessful database operation as a successful inventory change.
+
+### Trade-offs
+
+Cache invalidation is difficult because it introduces coordination between the database and cache.
+
+The database is the source of truth. Redis must not be allowed to independently determine whether a reservation is valid.
+
+---
