@@ -502,3 +502,80 @@ Express leaves many architectural decisions to the developer.
 Middleware ordering, validation, error handling, route structure, and security controls must be designed and maintained explicitly.
 
 ---
+
+## Decision 13 — React Native and Expo for Mobile
+
+### Context
+
+FlashDrop needed a mobile application that could be tested on an Android emulator and a physical Android phone.
+
+### Decision
+
+Use React Native with Expo and TypeScript.
+
+### Reasons
+
+- Cross-platform mobile development
+- TypeScript support
+- Expo development tooling
+- Simplified device testing
+- Cloud build support through EAS
+
+### Trade-offs
+
+- Native configuration still matters.
+- Expo Go and standalone builds have different capabilities.
+- Production environment variables must be included correctly in builds.
+- Native application changes require a new binary build.
+
+---
+
+## Decision 14 — Docker for Backend Containerization
+
+### Context
+
+The backend needed a consistent runtime environment across local development and deployment.
+
+### Decision
+
+Dockerize the backend.
+
+### Benefits
+
+- Consistent Node.js runtime
+- Reproducible environment
+- Easier deployment
+- Isolated application dependencies
+- Portable backend container
+
+### Multi-stage Docker build
+
+The backend Dockerfile uses separate build and runtime stages.
+
+The builder stage:
+
+- Installs dependencies
+- Copies source code
+- Compiles TypeScript
+
+The runtime stage:
+
+- Uses a Node.js base image
+- Installs production dependencies
+- Copies compiled output
+- Runs the application
+
+### Why multi-stage builds?
+
+The final container does not need the complete TypeScript source and development dependency tree to execute the compiled backend.
+
+This reduces unnecessary contents in the runtime image.
+
+### Trade-offs
+
+- Docker adds build and debugging complexity.
+- Container networking requires configuration.
+- Environment variables must be managed correctly.
+- Image size and build cache need to be monitored.
+
+---
