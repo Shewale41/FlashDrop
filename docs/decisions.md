@@ -209,3 +209,83 @@ Raw SQL requires more manual work:
 This approach was selected as a learning and engineering trade-off rather than a claim that raw SQL is universally better than an ORM.
 
 ---
+
+## Decision 4 — Parameterized Queries to Prevent SQL Injection
+
+### Context
+
+Dynamic SQL queries can become vulnerable to SQL injection if untrusted values are concatenated into query strings.
+
+### Decision
+
+Use parameterized queries with PostgreSQL placeholders.
+
+Example:
+
+```sql
+SELECT *
+FROM drops
+WHERE id = $1;
+```
+
+Values are supplied separately to the query execution function rather than inserted directly into SQL strings.
+
+### Benefits
+
+- Prevents user-controlled values from being interpreted as SQL syntax
+- Separates SQL structure from input data
+- Improves security and query correctness
+
+### Engineering lesson
+
+Prepared/parameterized queries should be the default approach when passing external input to SQL.
+
+---
+
+## Decision 5 — PostgreSQL Row-Level Locking for Reservation Concurrency
+
+### Context
+
+FlashDrop allows multiple users to reserve limited inventory.
+
+For example, if a drop has 3 items remaining and 10 users attempt to reserve simultaneously, only 3 reservations should succeed.
+
+Without synchronization, concurrent transactions could read the same available inventory before any transaction updates it. This can result in a race condition and overselling.
+
+### Decision
+
+Use PostgreSQL transactions and row-level locking with `SELECT ... FOR UPDATE` during reservation operations.
+
+### Reservation flow
+
+1. Begin a database transaction.
+2. Lock the relevant drop row.
+3. Read the current inventory after acquiring the lock.
+4. Verify that inventory is available.
+5. Check reservation constraints.
+6. Create the reservation.
+7. Decrement available inventory.
+8. Commit the transaction.
+
+If inventory is unavailable, the reservation is rejected.
+
+### Why `SELECT FOR UPDATE`?
+
+The row lock serializes competing transactions attempting to modify the same inventory row.
+
+A transaction must wait for the lock to be released before proceeding with the locked row, preventing multiple competing transactions from simultaneously making decisions using the same unlocked inventory state.
+
+### Trade-offs
+
+- Concurrent requests for the same drop may wait.
+- Lock contention can increase latency during popular drops.
+- Throughput may become limited by transactions competing for the same inventory row.
+
+However, the locking approach prioritizes inventory correctness over allowing unsafe parallel writes.
+
+### Result
+
+Reservation requests competing for the same inventory are handled in a controlled manner instead of allowing overselling.
+
+---
+
