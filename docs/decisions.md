@@ -360,3 +360,55 @@ Cache invalidation is difficult because it introduces coordination between the d
 The database is the source of truth. Redis must not be allowed to independently determine whether a reservation is valid.
 
 ---
+
+## Decision 8 — Redis Fallback Behavior
+
+### Context
+
+Redis is used for performance-related functionality, but the core reservation system should not become completely unavailable merely because the cache service has an issue.
+
+### Decision
+
+Implement fallback behavior for cache-related operations when Redis is unavailable, where the application logic permits it.
+
+### Expected behavior
+
+- Cache hit: use cached data.
+- Cache miss: fetch from PostgreSQL.
+- Cache unavailable: continue using PostgreSQL for cacheable reads where supported.
+- Reservation correctness: remains dependent on PostgreSQL transactions, not cache state.
+
+### Trade-offs
+
+Redis failure may increase database load and response latency.
+
+The fallback improves availability but does not eliminate the need to monitor Redis health and database capacity.
+
+---
+
+## Decision 9 — Redis for Rate Limiting
+
+### Context
+
+Public API endpoints can be repeatedly requested and may be abused or overloaded.
+
+A rate limiter is needed to control request frequency.
+
+### Decision
+
+Use Redis-backed rate limiting so request counters can be maintained outside individual Node.js process memory.
+
+### Reasons
+
+- Shared counters across application instances
+- Centralized rate-limit state
+- Better fit for a deployed backend than process-local counters
+- Redis expiration support
+
+### Trade-offs
+
+- Rate limiting depends on Redis availability/configuration.
+- Rate limits must be designed carefully to avoid blocking legitimate traffic.
+- Incorrect key design can apply limits to the wrong users or clients.
+
+---
