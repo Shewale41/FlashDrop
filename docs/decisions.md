@@ -579,3 +579,130 @@ This reduces unnecessary contents in the runtime image.
 - Image size and build cache need to be monitored.
 
 ---
+## Decision 15 — Docker Compose for Local Backend and Redis
+
+### Context
+
+Local development requires the API and Redis to communicate in a consistent environment.
+
+### Decision
+
+Use Docker Compose for local backend and Redis services.
+
+### Local architecture
+
+```text
+Docker Compose
+│
+├── API Container
+│   └── Express / Node.js
+│
+└── Redis Container
+    └── Cache and rate-limit data
+```
+
+### Networking
+
+Inside Docker Compose, the backend uses the Redis service hostname:
+
+```text
+redis://redis:6379
+```
+
+The hostname `redis` resolves through the Compose network.
+
+### Trade-offs
+
+- Requires Docker to be running.
+- Container networking differs from host networking.
+- Environment configuration differs between local development and production.
+
+---
+
+## Decision 16 — Environment-Based Service Configuration
+
+### Context
+
+FlashDrop runs in multiple environments:
+
+- Local development
+- Docker Compose
+- Cloud backend deployment
+- Expo development
+- Standalone Android builds
+
+Each environment uses different service endpoints.
+
+### Decision
+
+Use environment variables for service configuration.
+
+### Examples
+
+| Environment | PostgreSQL | Redis |
+|---|---|---|
+| Local API | Neon | `redis://localhost:6379` |
+| Docker Compose API | Neon | `redis://redis:6379` |
+| Production API | Neon | Upstash `rediss://` |
+
+The backend reads configuration from environment variables instead of hardcoding service credentials and URLs.
+
+### Benefits
+
+- Same backend code across environments
+- Environment-specific infrastructure
+- No need to hardcode credentials
+- Easier deployment configuration
+
+### Trade-offs
+
+- Missing variables can cause runtime failures.
+- Incorrect environment values can connect the app to the wrong service.
+- Cloud build environments must include the correct public frontend configuration.
+
+---
+
+## Decision 17 — Render for Backend Deployment
+
+### Context
+
+The backend needed a public HTTPS endpoint accessible by the mobile application.
+
+### Decision
+
+Deploy the Dockerized backend to Render.
+
+### Reasons
+
+- Docker deployment support
+- Public web service
+- Straightforward deployment from project source
+- Suitable for the project's zero-cost deployment goal at the time of setup
+
+### Deployment architecture
+
+```text
+Mobile Application
+        │
+        │ HTTPS
+        ▼
+Render
+┌────────────────────┐
+│ Dockerized API    │
+│ Node.js / Express │
+└─────────┬──────────┘
+          │
+     ┌────┴─────┐
+     ▼          ▼
+   Neon      Upstash
+ PostgreSQL    Redis
+```
+
+### Trade-offs
+
+- Free-tier resource constraints
+- Cold starts or service availability limitations depending on the hosting plan
+- Backend latency can be influenced by hosting location and external services
+- Production capacity is not equivalent to a dedicated production infrastructure
+
+---
