@@ -1,3 +1,4 @@
+
 # FlashDrop — Engineering Decisions, Bottlenecks & Problem Solving
 
 > A reservation platform built to explore backend engineering concepts such as concurrency control, inventory consistency, caching, authentication, rate limiting, deployment, and performance testing.
@@ -118,6 +119,7 @@ Rather than treating FlashDrop as a simple CRUD application, the project was des
 PostgreSQL remains the source of truth for reservation and inventory data.
 
 ---
+
 # 4. Engineering Decisions
 
 ## Decision 1 — PostgreSQL as the Primary Database
@@ -412,6 +414,7 @@ Use Redis-backed rate limiting so request counters can be maintained outside ind
 - Incorrect key design can apply limits to the wrong users or clients.
 
 ---
+
 ## Decision 10 — JWT Authentication
 
 ### Context
@@ -579,6 +582,7 @@ This reduces unnecessary contents in the runtime image.
 - Image size and build cache need to be monitored.
 
 ---
+
 ## Decision 15 — Docker Compose for Local Backend and Redis
 
 ### Context
@@ -706,6 +710,7 @@ Render
 - Production capacity is not equivalent to a dedicated production infrastructure
 
 ---
+
 ## Decision 18 — Upstash for Production Redis
 
 ### Context
