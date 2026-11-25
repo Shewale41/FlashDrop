@@ -118,3 +118,94 @@ Rather than treating FlashDrop as a simple CRUD application, the project was des
 PostgreSQL remains the source of truth for reservation and inventory data.
 
 ---
+# 4. Engineering Decisions
+
+## Decision 1 — PostgreSQL as the Primary Database
+
+### Context
+
+The reservation system requires reliable inventory management and consistent reservation state. Concurrent requests must not result in inventory being oversold.
+
+### Decision
+
+Use PostgreSQL as the primary database.
+
+### Reasons
+
+- ACID transactions
+- Row-level locking
+- Strong consistency
+- Relational constraints
+- Reliable handling of concurrent writes
+- SQL-based querying
+- Ability to use transactions for reservation operations
+
+### Trade-offs
+
+PostgreSQL introduces database connection management, query optimization, transaction handling, and lock contention considerations.
+
+However, these trade-offs were appropriate because inventory correctness was more important than using a simpler data store.
+
+---
+
+## Decision 2 — Neon for Managed PostgreSQL
+
+### Context
+
+The application needed a remotely accessible database without managing a database server on a local machine.
+
+### Decision
+
+Use Neon as the hosted PostgreSQL provider.
+
+### Reasons
+
+- Managed PostgreSQL infrastructure
+- Remote access from local development and deployed backend
+- Reduced infrastructure maintenance
+- Suitable for a project deployed on a separate backend host
+
+### Architecture
+
+- Local development connects to Neon.
+- Production backend connects to Neon through environment configuration.
+- The database is not bundled inside the backend Docker container.
+
+### Trade-offs
+
+The application depends on an external managed database service and network connectivity.
+
+---
+
+## Decision 3 — Raw SQL Instead of an ORM
+
+### Context
+
+The project was intended to improve understanding of backend engineering and database behavior, particularly query execution, transactions, locking, and performance.
+
+### Decision
+
+Use raw SQL queries through the PostgreSQL client rather than relying on an ORM to abstract database operations.
+
+### Reasons
+
+- Direct control over SQL
+- Explicit query behavior
+- Better understanding of query execution
+- Easier to reason about row locking
+- Direct use of prepared statements
+- Reduced abstraction when debugging database performance
+
+### Trade-offs
+
+Raw SQL requires more manual work:
+
+- Query maintenance
+- Mapping database results
+- Handling migrations and schema changes
+- Preventing SQL injection
+- Maintaining consistency across queries
+
+This approach was selected as a learning and engineering trade-off rather than a claim that raw SQL is universally better than an ORM.
+
+---
