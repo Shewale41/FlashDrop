@@ -412,3 +412,93 @@ Use Redis-backed rate limiting so request counters can be maintained outside ind
 - Incorrect key design can apply limits to the wrong users or clients.
 
 ---
+## Decision 10 — JWT Authentication
+
+### Context
+
+The API contains user-specific functionality such as reservations. Requests to protected endpoints must identify and authenticate the user.
+
+### Decision
+
+Use JSON Web Tokens for authentication.
+
+### Authentication flow
+
+1. User submits login credentials.
+2. Backend verifies the password.
+3. Backend creates a JWT.
+4. Token is returned to the client.
+5. Client stores the token.
+6. Client sends the token with protected API requests.
+7. Authentication middleware validates the token.
+8. The request continues with authenticated user context.
+
+### Token configuration
+
+The project used a short-lived JWT configuration during implementation, including a 15-minute expiration in the login flow.
+
+### Benefits
+
+- Stateless authentication
+- No need to maintain a server-side session for each request
+- Authentication middleware can validate tokens
+- Suitable for REST API authentication
+
+### Trade-offs
+
+- Token expiration requires handling re-authentication or future refresh-token functionality.
+- Token storage must be handled securely on mobile.
+- A compromised token remains usable until expiration or additional revocation mechanisms are implemented.
+
+---
+
+## Decision 11 — bcrypt for Password Hashing
+
+### Context
+
+Passwords should never be stored in plaintext.
+
+### Decision
+
+Use bcrypt to hash passwords before storing them in PostgreSQL.
+
+### Implementation approach
+
+- Hash passwords during registration.
+- Store the hash, not the original password.
+- Verify submitted passwords against the stored hash during login.
+
+### Benefits
+
+- Passwords are not stored in plaintext.
+- bcrypt provides computationally expensive password hashing.
+- Reduces impact of database credential exposure.
+
+---
+
+## Decision 12 — Express and TypeScript for Backend Development
+
+### Context
+
+The application needed a backend capable of handling REST API routes, authentication, database queries, Redis, and reservation logic.
+
+### Decision
+
+Use Express with TypeScript.
+
+### Reasons
+
+- Lightweight backend framework
+- Straightforward middleware architecture
+- Flexible route organization
+- Familiar JavaScript ecosystem
+- Type safety through TypeScript
+- Easy integration with PostgreSQL and Redis
+
+### Trade-offs
+
+Express leaves many architectural decisions to the developer.
+
+Middleware ordering, validation, error handling, route structure, and security controls must be designed and maintained explicitly.
+
+---
