@@ -706,3 +706,976 @@ Render
 - Production capacity is not equivalent to a dedicated production infrastructure
 
 ---
+## Decision 18 — Upstash for Production Redis
+
+### Context
+
+The production backend runs independently of the local development machine.
+
+A local Redis container cannot be used by the deployed Render service.
+
+### Decision
+
+Use Upstash Redis as the remotely accessible Redis service.
+
+### Reasons
+
+- Managed Redis service
+- Accessible by deployed backend
+- No Redis server administration
+- TLS-enabled Redis connection
+- Compatible with Redis-based caching and rate-limiting use cases
+
+### Connection configuration
+
+Production uses a remote Redis URL through the `REDIS_URL` environment variable.
+
+The application does not need a separate hardcoded production Redis implementation.
+
+### Trade-offs
+
+- External network dependency
+- Redis service limits
+- Latency between backend and Redis provider
+- Requires secure environment configuration
+
+---
+
+## Decision 19 — EAS Cloud Builds for Android
+
+### Context
+
+Local Android builds on Windows encountered build tooling and filesystem path issues, including CMake/Ninja path-related failures.
+
+The local build environment was taking time away from application development and deployment.
+
+### Decision
+
+Use Expo EAS cloud builds for Android binaries.
+
+### Reasons
+
+- Cloud build environment
+- Reduced dependency on local Android build toolchain
+- Avoided recurring local Windows build issues
+- Easier APK generation
+
+### Trade-offs
+
+- Cloud build queue and build time
+- Build configuration must be correct
+- Environment variables must be configured for the correct build profile
+- Build artifacts must be downloaded and tested
+
+---
+
+## Decision 20 — APK for Direct Android Distribution
+
+### Context
+
+The goal was to install FlashDrop on physical devices and distribute it directly without requiring Google Play Store publishing.
+
+### Decision
+
+Generate an Android APK through EAS.
+
+### APK advantages
+
+- Direct installation on Android devices
+- Easy to share
+- Suitable for GitHub Releases
+- Does not require Play Store publication
+
+### Trade-offs
+
+- Users may need to allow installation from unknown sources.
+- APK distribution does not provide Play Store update mechanisms.
+- Updates must be distributed through new builds.
+- Android package identity must remain consistent for upgrades.
+
+### Future consideration
+
+Google Play releases should use an Android App Bundle (AAB) when preparing Play Store publication.
+
+---
+
+# 5. Problems Encountered & Solutions
+
+## Problem 1 — Pagination and Full Database Fetch Timeout
+
+### Problem
+
+An API request attempted to retrieve approximately 100,004 rows from the `drops` table in a single request.
+
+The full query timed out, even though smaller database queries succeeded.
+
+### Observations
+
+During investigation:
+
+- `COUNT(*)` succeeded.
+- `SELECT 1` succeeded.
+- `LIMIT 1000` succeeded in testing, although response behavior varied.
+- Retrieving the entire dataset timed out.
+
+### Root cause
+
+The problem was not simply that PostgreSQL was unavailable.
+
+Retrieving a very large dataset in one request introduced significant work involving:
+
+- Query execution
+- Data retrieval
+- Network transfer
+- Node.js result handling
+- Serialization
+- Response transmission
+
+A large response creates overhead beyond database query execution itself.
+
+### Solution / engineering direction
+
+Use pagination instead of returning every row.
+
+The API should:
+
+- Limit the number of returned rows.
+- Support page-based or cursor-based retrieval.
+- Return a manageable response size.
+- Allow the client to request additional records incrementally.
+
+### Engineering lesson
+
+A query returning successfully in the database does not guarantee that returning the entire result set through an HTTP API is efficient.
+
+Pagination is a fundamental API scalability requirement.
+
+---
+
+## Problem 2 — Concurrent Reservation Race Condition
+
+### Problem
+
+Multiple users could attempt to reserve the same limited inventory simultaneously.
+
+Without synchronization, concurrent requests could observe the same available inventory and both attempt to reserve it.
+
+### Risk
+
+Overselling inventory.
+
+### Solution
+
+Use PostgreSQL transaction-level coordination and row locking with `SELECT FOR UPDATE`.
+
+### Expected behavior
+
+For a drop containing 3 available items and 10 competing reservation requests:
+
+- At most 3 requests should successfully reserve.
+- Remaining requests should be rejected when inventory is exhausted.
+- Final inventory should not become negative.
+- The reservation count should not exceed the original available inventory.
+
+### Verification
+
+A concurrency simulation was conducted with 10 users competing for 3 items.
+
+Observed result:
+
+- 3 successful reservations
+- 7 rejected reservations
+- 0 remaining inventory
+
+### Engineering lesson
+
+Application-level checks alone are insufficient for concurrency-sensitive inventory operations.
+
+Correctness must be enforced by the database transaction and locking strategy.
+
+---
+
+## Problem 3 — Cache Staleness After Inventory Updates
+
+### Problem
+
+Caching drop data improves read performance, but inventory is mutable.
+
+If cached inventory remains unchanged after a reservation, subsequent clients may receive stale data.
+
+### Solution
+
+Invalidate relevant cache entries following successful database mutations.
+
+### Flow
+
+```text
+Reservation Request
+       │
+       ▼
+Database Transaction
+       │
+       ▼
+Inventory Updated
+       │
+       ▼
+Transaction Committed
+       │
+       ▼
+Cache Invalidated
+       │
+       ▼
+Next Read Fetches Fresh Data
+```
+
+### Engineering lesson
+
+Caching mutable data requires an explicit consistency strategy.
+
+Cache invalidation is part of application logic, not an optional optimization.
+
+---
+
+## Problem 4 — Redis Configuration Across Environments
+
+### Problem
+
+The backend uses different Redis connection addresses depending on where it runs.
+
+A connection working locally does not necessarily work inside Docker or in production.
+
+### Environment differences
+
+- Host machine: `localhost`
+- Docker Compose: Redis service hostname `redis`
+- Production: remote Upstash connection URL
+
+### Solution
+
+Configure Redis using `REDIS_URL`.
+
+The same backend implementation uses environment configuration to connect to the appropriate Redis instance.
+
+### Engineering lesson
+
+`localhost` is relative to the environment in which the application runs.
+
+Inside a container, `localhost` refers to that container, not another service or the host machine.
+
+---
+
+## Problem 5 — TypeScript / ESM Runtime Issues
+
+### Problem
+
+The backend encountered module configuration errors during development, including:
+
+```text
+SyntaxError: Cannot use import statement outside a module
+```
+
+### Cause
+
+The runtime was not interpreting the emitted/imported JavaScript using the intended module configuration.
+
+### Solution
+
+Configure the project for ES modules, including the package module setting:
+
+```json
+{
+  "type": "module"
+}
+```
+
+The TypeScript build and Node.js runtime configuration must agree on module behavior.
+
+### Engineering lesson
+
+TypeScript compilation does not eliminate JavaScript runtime module configuration requirements.
+
+ESM import/export behavior must be compatible with the Node.js runtime and emitted build output.
+
+---
+
+## Problem 6 — Express Type Import Runtime Error
+
+### Problem
+
+A runtime import involving Express types failed:
+
+```text
+The requested module 'express' does not provide an export named 'NextFunction'
+```
+
+### Cause
+
+TypeScript-only types were being handled as runtime imports rather than type-only imports.
+
+### Solution
+
+Use type-only imports for types that should not exist in emitted JavaScript.
+
+Example:
+
+```typescript
+import type { NextFunction, Request, Response } from "express";
+```
+
+### Engineering lesson
+
+TypeScript types are erased at compilation.
+
+Using `import type` prevents type-only dependencies from being treated as runtime values.
+
+---
+
+## Problem 7 — Docker Image Size
+
+### Problem
+
+The initial backend container image contained unnecessary build/development content.
+
+### Decision / solution
+
+Use a multi-stage Docker build with separate builder and runtime stages.
+
+Only the compiled backend and production dependencies are copied into the final runtime image.
+
+### Recorded Docker baseline
+
+| Metric | Observed value |
+|---|---:|
+| `server-api:latest` Docker disk usage | 360 MB |
+| Docker content size | 84 MB |
+| Total disk usage across 3 images | 894.2 MB |
+| Build cache | 633.5 MB |
+| Reclaimable build cache | 273.2 MB |
+| Containers | 4 (2 active) |
+| Local volumes | 89 B |
+
+### Important distinction
+
+Docker image **disk usage** and **content size** are different metrics.
+
+These values should not be reported interchangeably.
+
+The image metrics are environment-specific and represent a recorded baseline, not a universal image size.
+
+### Engineering lesson
+
+Multi-stage builds reduce unnecessary runtime contents, but Docker disk usage also includes image layers, build cache, and other images stored locally.
+
+---
+
+## Problem 8 — Local Android Build Failures on Windows
+
+### Problem
+
+Local Android builds encountered issues involving:
+
+- Gradle
+- CMake
+- Ninja
+- Windows path-length constraints
+- Android emulator/ADB setup
+
+Some errors were related to native build paths and toolchain configuration.
+
+### Impact
+
+Repeated local build failures slowed down delivery and did not contribute directly to application functionality.
+
+### Solution
+
+Use EAS cloud builds for Android binary generation.
+
+### Engineering lesson
+
+A development environment problem should not unnecessarily block delivery when a reliable alternative build environment is available.
+
+---
+
+## Problem 9 — APK Installation Failure on Physical Device
+
+### Problem
+
+An earlier APK build failed to install on a physical Android device and displayed:
+
+> App not installed — package appears to be invalid.
+
+### Investigation direction
+
+The issue was isolated from backend/network configuration.
+
+The build artifact, device compatibility, APK integrity, and installation diagnostics needed to be treated separately from API connectivity.
+
+### Resolution
+
+A subsequent EAS build was downloaded and successfully installed on the physical Android phone.
+
+### Verification
+
+FlashDrop was confirmed running on:
+
+- Android emulator
+- Physical Android device
+
+### Engineering lesson
+
+An APK installation failure and an application network failure are separate categories of issues and should be diagnosed independently.
+
+---
+
+## Problem 10 — Production API Network Error in Standalone Build
+
+### Problem
+
+The standalone Android app initially displayed a network error when attempting to log in.
+
+### Investigation
+
+The development app worked, but the standalone EAS build did not have the expected production API URL configuration.
+
+### Cause
+
+The frontend production API environment variable was not correctly available in the EAS preview build environment.
+
+### Solution
+
+Configure:
+
+```text
+EXPO_PUBLIC_API_URL
+```
+
+in the appropriate EAS build environment.
+
+The variable must be available at build time for the standalone app.
+
+### Result
+
+After updating the EAS environment configuration and rebuilding:
+
+- Standalone app login worked.
+- The app connected to the production backend.
+- The emulator standalone build was confirmed working.
+
+The updated APK was subsequently installed and verified on the physical Android phone.
+
+### Engineering lesson
+
+Expo environment variables used by client code may be embedded during build.
+
+A local `.env` file is not automatically equivalent to an EAS cloud build environment.
+
+---
+
+## Problem 11 — EAS Project Slug Mismatch
+
+### Problem
+
+A build failed with the error:
+
+```text
+Project config: Slug for project identified by
+"extra.eas.projectId" (mobile) does not match
+the "slug" field (Flashdrop).
+```
+
+### Cause
+
+The project was linked to an existing EAS project with the slug `mobile`, but the local Expo configuration had changed the slug to `Flashdrop`.
+
+### Solution
+
+Keep the display name separate from the EAS project slug.
+
+```json
+{
+  "expo": {
+    "name": "Flashdrop",
+    "slug": "mobile"
+  }
+}
+```
+
+### Engineering lesson
+
+The application display name and Expo project slug serve different purposes.
+
+Changing the visible application name does not require changing the linked EAS slug.
+
+---
+
+## Problem 12 — Android Icon Configuration
+
+### Problem
+
+The app name was updated, but the Android launcher icon configuration used separate adaptive icon assets.
+
+### Cause
+
+Android adaptive icons were configured independently from the general Expo icon property.
+
+### Solution
+
+Configure the Android adaptive icon assets explicitly.
+
+The launcher icon configuration uses:
+
+- Foreground image
+- Background image/color
+- Monochrome image where configured
+
+### Engineering lesson
+
+Changing the general Expo `icon` field does not necessarily replace every platform-specific launcher icon asset.
+
+The actual icon must be configured for the target platform and included in a new binary build.
+
+---
+
+# 6. Performance Testing & Benchmarks
+
+Performance testing was performed to understand backend behavior under simulated traffic rather than relying only on manual testing.
+
+## Load Test Baseline
+
+A load test was run with 10 virtual users over 30 seconds.
+
+| Metric | Recorded result |
+|---|---:|
+| Virtual users | 10 |
+| Test duration | 30 seconds |
+| Total requests | 242 |
+| Throughput | 5.57 requests/sec |
+| p95 latency | 19.7 ms |
+| Failure rate | 0.41% |
+| Maximum observed latency | 19.25 seconds |
+
+### Interpretation
+
+The test generated a small amount of simulated traffic and provided an initial baseline.
+
+The p95 latency and maximum latency are substantially different, which indicates that the test included a long-tail latency event.
+
+The low p95 should not be interpreted as proof that all requests were fast.
+
+### Important limitations
+
+- Only 10 virtual users were used.
+- Test duration was short.
+- This was not a large-scale capacity test.
+- The maximum latency requires investigation.
+- The 0.41% failure rate means the run was not completely error-free.
+- Results depend on the environment, hosting conditions, and test configuration.
+
+These measurements should be treated as a baseline, not a claim of production capacity.
+
+---
+
+## Concurrency Test
+
+A simulated reservation test was conducted with 10 concurrent users competing for 3 available items.
+
+| Metric | Result |
+|---|---:|
+| Concurrent users | 10 |
+| Initial inventory | 3 |
+| Successful reservations | 3 |
+| Rejected reservations | 7 |
+| Final inventory | 0 |
+
+### Outcome
+
+The system did not oversell the available inventory during the test.
+
+The result demonstrated that reservation logic correctly handled competing requests for the tested scenario.
+
+### Limitation
+
+This test validates a specific scenario. It does not prove correctness under every possible workload, failure condition, or concurrency level.
+
+---
+
+# 7. Metrics We Care About
+
+Future performance tests should capture:
+
+### API
+
+- Requests per second (RPS)
+- Total requests
+- Error rate
+- Response time
+
+### Latency
+
+- Average
+- Median (p50)
+- p90
+- p95
+- p99
+- Maximum
+
+### PostgreSQL
+
+- Query execution time
+- Query planning time
+- Connection pool usage
+- Lock waiting
+- Transaction duration
+- Database load
+
+### Redis
+
+- Cache hit rate
+- Cache miss rate
+- Redis response time
+- Memory usage
+- Connection errors
+
+### Docker / Infrastructure
+
+- CPU usage
+- Memory usage
+- Image size
+- Container resource consumption
+
+### Reservation correctness
+
+- Successful reservations
+- Rejected reservations
+- Remaining inventory
+- Duplicate reservations
+- Overselling incidents
+
+---
+
+# 8. Known Bottlenecks & Limitations
+
+## 8.1 Database contention
+
+Popular drops can cause many transactions to compete for the same inventory row.
+
+Row locking protects correctness, but lock contention can affect throughput and latency.
+
+Possible future investigation:
+
+- Lock wait time
+- Transaction duration
+- Reservation query optimization
+- Different inventory allocation strategies
+
+---
+
+## 8.2 Cache consistency
+
+Cached inventory can become stale if invalidation is missed or fails.
+
+The database remains authoritative.
+
+Possible future improvements:
+
+- More systematic cache invalidation
+- Cache versioning
+- Short TTLs where appropriate
+- Better monitoring of cache behavior
+
+---
+
+## 8.3 Large result sets
+
+Returning large datasets in one response can cause:
+
+- Database workload
+- High memory usage
+- Serialization overhead
+- Network transfer delays
+- API timeouts
+
+Pagination is required for large collections.
+
+---
+
+## 8.4 External service dependencies
+
+FlashDrop relies on:
+
+- Render
+- Neon
+- Upstash
+
+Failures, latency, service limits, or availability issues in external services can affect the application.
+
+---
+
+## 8.5 Free-tier infrastructure
+
+The deployed infrastructure is intended for a project/demo environment.
+
+It is not a high-availability production architecture.
+
+Potential constraints include:
+
+- Limited CPU
+- Limited memory
+- Service sleep/cold-start behavior
+- Database connection limits
+- Redis limits
+- Network latency
+
+---
+
+## 8.6 Limited load-testing scale
+
+The recorded test used 10 virtual users for 30 seconds.
+
+It is not sufficient to establish:
+
+- Maximum capacity
+- Sustained throughput
+- Production traffic readiness
+- Behavior under hundreds or thousands of concurrent users
+
+Higher-scale testing should be performed in a controlled environment with resource monitoring.
+
+---
+
+# 9. Deployment Architecture
+
+## Local Development
+
+```text
+Developer Machine
+│
+├── React Native / Expo
+│
+├── Node.js API
+│
+└── Docker Compose
+    └── Redis
+```
+
+PostgreSQL is accessed through Neon.
+
+---
+
+## Production
+
+```text
+Android App
+    │
+    │ HTTPS
+    ▼
+Render
+    │
+    ├── Node.js / Express API
+    │
+    ├──────────────► Neon PostgreSQL
+    │
+    └──────────────► Upstash Redis
+```
+
+### Production environment configuration
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection |
+| `JWT_SECRET` | JWT signing secret |
+| `REDIS_URL` | Redis connection |
+| `EXPO_PUBLIC_API_URL` | Mobile app API base URL |
+
+Secrets are configured in deployment environments rather than committed to the source repository.
+
+---
+
+# 10. Release & Versioning
+
+## Version 1.0.0
+
+FlashDrop's first release represents the initial deployed and installable mobile application.
+
+### Release process
+
+1. Complete frontend and backend changes.
+2. Verify backend deployment.
+3. Verify production environment variables.
+4. Build Android application through EAS.
+5. Install the build on a physical Android device.
+6. Test login and core reservation flow.
+7. Commit release changes.
+8. Create Git tag.
+9. Publish GitHub Release.
+10. Attach APK.
+
+### Versioning convention
+
+Use semantic versioning:
+
+```text
+MAJOR.MINOR.PATCH
+```
+
+Examples:
+
+| Version | Meaning |
+|---|---|
+| `1.0.0` | Initial release |
+| `1.0.1` | Backward-compatible bug fixes |
+| `1.1.0` | Backward-compatible features |
+| `2.0.0` | Major changes that may break compatibility |
+
+---
+
+# 11. Future Engineering Improvements
+
+These are potential future improvements, not features currently claimed to be implemented.
+
+## Backend
+
+- Better structured logging
+- Centralized error handling
+- API validation
+- Monitoring and alerting
+- More extensive integration tests
+- Automated deployment pipeline
+- Better reservation idempotency
+- Improved reservation expiration handling
+- Transaction failure/retry strategies
+
+## Database
+
+- Query plan analysis
+- Index benchmarking
+- Connection pool tuning
+- Lock contention analysis
+- Cursor-based pagination
+- Query performance monitoring
+
+## Redis
+
+- Cache hit/miss instrumentation
+- TTL tuning
+- Cache invalidation reliability
+- Redis failure testing
+- Rate-limit strategy review
+
+## Load Testing
+
+- Increase virtual users gradually
+- Test longer durations
+- Run endpoint-specific tests
+- Test reservation bursts
+- Track p50/p95/p99
+- Measure error rates
+- Monitor PostgreSQL and Redis
+- Compare results before and after optimizations
+
+## Mobile
+
+- Improve release branding
+- Add loading/error states where needed
+- Improve offline/network handling
+- Release management
+- App distribution
+- Future Play Store publication
+
+---
+
+# 12. Key Engineering Lessons
+
+### Correctness before performance
+
+Inventory reservation must remain correct under concurrency. A fast reservation system that oversells is not acceptable.
+
+### The database is the source of truth
+
+Redis can improve read performance, but it should not determine authoritative inventory state.
+
+### Caching introduces complexity
+
+Caching reduces repeated work, but cache invalidation and stale data must be handled intentionally.
+
+### Pagination is a necessity
+
+Large datasets should not be returned in a single API response.
+
+### Test the system, not just the code
+
+Manual testing verifies functionality. Load testing and concurrency testing help reveal behavior under competing requests and traffic.
+
+### Measure before making performance claims
+
+Benchmarks should include test conditions and be repeatable.
+
+### Deployment is part of software engineering
+
+Environment configuration, containerization, production services, cloud builds, and installation are all part of delivering an application.
+
+### Failures are valuable engineering experience
+
+The most useful problems encountered were not merely coding errors. They involved runtime configuration, environment differences, database behavior, networking, build infrastructure, and deployment.
+
+---
+
+# 13. Project Completion Summary
+
+FlashDrop was developed from a mobile application concept into a deployed Android application connected to a production backend.
+
+The project explored:
+
+- Full-stack mobile application development
+- REST API design
+- JWT authentication
+- Password hashing
+- PostgreSQL
+- SQL query safety
+- Database transactions
+- Row-level locking
+- Concurrency control
+- Inventory consistency
+- Redis caching
+- Cache invalidation
+- Rate limiting
+- Docker
+- Docker Compose
+- Environment configuration
+- Cloud deployment
+- Load testing
+- Android cloud builds
+- Physical device testing
+
+The primary engineering focus was building a reservation system that handles limited inventory safely while learning how backend design decisions affect correctness, performance, and deployment.
+
+---
+
+## 14. Final Status
+
+| Component | Status |
+|---|---|
+| Mobile application | Completed |
+| Backend REST API | Deployed |
+| Authentication | Implemented |
+| PostgreSQL | Connected |
+| Redis | Configured |
+| Cache-aside strategy | Implemented |
+| Cache invalidation | Implemented |
+| Rate limiting | Implemented |
+| Reservation concurrency control | Implemented |
+| Docker backend | Implemented |
+| Local Docker Compose | Configured |
+| Production backend | Deployed |
+| Android cloud build | Completed |
+| Emulator testing | Completed |
+| Physical Android testing | Completed |
+| Version 1.0.0 | Built |
+
+---
+
+> **FlashDrop v1.0.0 — Completed**
+>
+> Built, deployed, and verified on a physical Android device.
+>
+> This document records the engineering decisions, problems encountered, solutions implemented, and measurements obtained during development. Benchmark values represent the specific recorded test runs and should not be generalized beyond their test conditions.
